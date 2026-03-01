@@ -151,8 +151,9 @@ class ProxyController extends Controller
                 $proxies = $orderData['proxies'];
                 $user = $orderData['user'];
 
-                // 1. Notify User
-                $user->notify(new \App\Notifications\ProxyCreatedNotification([
+                // 1. Notify User (Using direct route to avoid serialization issues)
+                \Illuminate\Support\Facades\Notification::route('mail', $user->email)
+                    ->notify(new \App\Notifications\ProxyCreatedNotification([
                     'user' => ['name' => $user->name],
                     'product' => ['name' => $product->name],
                     'order' => ['id' => $order->id],

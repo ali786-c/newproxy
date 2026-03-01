@@ -9,7 +9,7 @@ use Illuminate\Notifications\Notification;
 use App\Services\EmailTemplateService;
 use Illuminate\Support\HtmlString;
 
-abstract class BaseDynamicNotification extends Notification implements ShouldQueue
+abstract class BaseDynamicNotification extends Notification
 {
     use Queueable;
 
