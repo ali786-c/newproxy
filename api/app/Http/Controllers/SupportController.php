@@ -53,6 +53,37 @@ class SupportController extends Controller
             'is_admin_reply' => trim($request->user()->role) === 'admin',
         ]);
 
+        // --- NEW: Trigger Dynamic Emails ---
+        try {
+            $user = $request->user();
+            // 1. Send Confirmation to User
+            $user->notify(new \App\Notifications\TicketOpenedNotification([
+                'user' => ['name' => $user->name],
+                'ticket' => [
+                    'id' => $ticket->id,
+                    'subject' => $ticket->subject
+                ],
+                'action_url' => url('/app/tickets/' . $ticket->id),
+                'year' => date('Y')
+            ]));
+
+            // 2. Alert Admin about new ticket
+            $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.com');
+            \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
+                ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_ticket', [
+                    'user' => ['email' => $user->email],
+                    'ticket' => [
+                        'subject' => $ticket->subject,
+                        'priority' => $ticket->priority
+                    ],
+                    'admin_url' => url('/admin/tickets/' . $ticket->id),
+                    'year' => date('Y')
+                ]));
+        } catch (\Exception $e) {
+            \Log::error("Failed to send support ticket emails: " . $e->getMessage());
+        }
+        // -----------------------------------
+
         return response()->json($ticket->load('messages'), 201);
     }
 
@@ -106,6 +137,25 @@ class SupportController extends Controller
         // Auto-update status if admin replies
         if (trim($request->user()->role) === 'admin' && $ticket->status === 'open') {
             $ticket->update(['status' => 'in_progress']);
+
+            // --- NEW: Send Reply Notification to User ---
+            try {
+                $ticketUser = $ticket->user;
+                if ($ticketUser) {
+                    $ticketUser->notify(new \App\Notifications\SupportReplyNotification([
+                        'user' => ['name' => $ticketUser->name],
+                        'ticket' => [
+                            'id' => $ticket->id,
+                            'subject' => $ticket->subject
+                        ],
+                        'reply_content' => $request->message,
+                        'action_url' => url('/app/tickets/' . $ticket->id),
+                        'year' => date('Y')
+                    ]));
+                }
+            } catch (\Exception $e) {
+                \Log::error("Failed to send support reply email: " . $e->getMessage());
+            }
         }
 
         return response()->json($message);

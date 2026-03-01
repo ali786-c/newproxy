@@ -27,6 +27,18 @@ class PasswordResetController extends Controller
 
         \Illuminate\Support\Facades\Log::info("Password reset link for {$user->email}: " . url("/reset-password?token={$token}&email=" . urlencode($user->email)));
 
+        // --- NEW: Trigger Dynamic Reset Email ---
+        try {
+            $user->notify(new \App\Notifications\ResetPasswordNotification([
+                'user' => ['name' => $user->name],
+                'reset_url' => url('/reset-password?token=' . $token . '&email=' . $user->email),
+                'year' => date('Y')
+            ]));
+        } catch (\Exception $e) {
+            \Log::error("Reset Password Email Error: " . $e->getMessage());
+        }
+        // ----------------------------------------
+
         return response()->json(['message' => 'Password reset link sent successfully.']);
     }
 
@@ -49,6 +61,18 @@ class PasswordResetController extends Controller
 
         $user->password = Hash::make($request->password);
         $user->save();
+
+        // --- NEW: Trigger Password Changed Email ---
+        try {
+            $user->notify(new \App\Notifications\GenericDynamicNotification('password_changed_user', [
+                'user' => ['name' => $user->name],
+                'action_url' => url('/login'),
+                'year' => date('Y')
+            ]));
+        } catch (\Exception $e) {
+            \Log::error("Password Changed Email Error: " . $e->getMessage());
+        }
+        // -------------------------------------------
 
         DB::table('password_reset_tokens')->where('email', $request->email)->delete();
 

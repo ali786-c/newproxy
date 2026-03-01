@@ -463,6 +463,36 @@ class BillingController extends Controller
                     ['event_id' => $uuid],
                     ['provider' => 'cryptomus']
                 );
+
+                // --- NEW: Trigger Order Confirmation Email ---
+                try {
+                    $user->notify(new \App\Notifications\OrderConfirmationNotification([
+                        'user' => ['name' => $user->name],
+                        'order' => [
+                            'id' => $uuid,
+                            'amount' => ($data['currency'] ?? 'EUR') . ' ' . $amount
+                        ],
+                        'action_url' => url('/app/billing'),
+                        'year' => date('Y')
+                    ]));
+                    
+                    // Alert Admin
+                    $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.com');
+                    \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
+                        ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_order', [
+                            'user' => ['email' => $user->email],
+                            'order' => [
+                                'id' => $uuid,
+                                'amount' => ($data['currency'] ?? 'EUR') . ' ' . $amount
+                            ],
+                            'admin_url' => url('/admin/billing'),
+                            'year' => date('Y')
+                        ]));
+                } catch (\Exception $e) {
+                    \Log::error("Order Confirmation Email Error: " . $e->getMessage());
+                }
+                // ----------------------------------------------
+
                 $fulfillmentLog->update(['stage' => 1, 'status' => 'success']);
             });
             Log::info("STAGE 1 OK: Cryptomus Invoice committed for User #{$userId}, UUID: {$uuid}");
@@ -790,6 +820,35 @@ class BillingController extends Controller
                     ['event_id' => $eventId],
                     ['provider' => 'stripe']
                 );
+
+                // --- NEW: Trigger Order Confirmation Email ---
+                try {
+                    $user->notify(new \App\Notifications\OrderConfirmationNotification([
+                        'user' => ['name' => $user->name],
+                        'order' => [
+                            'id' => $session->id,
+                            'amount' => $currency . ' ' . $paidGross
+                        ],
+                        'action_url' => url('/app/billing'),
+                        'year' => date('Y')
+                    ]));
+
+                    // Alert Admin
+                    $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.com');
+                    \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
+                        ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_order', [
+                            'user' => ['email' => $user->email],
+                            'order' => [
+                                'id' => $session->id,
+                                'amount' => $currency . ' ' . $paidGross
+                            ],
+                            'admin_url' => url('/admin/billing'),
+                            'year' => date('Y')
+                        ]));
+                } catch (\Exception $e) {
+                    \Log::error("Stripe Order Confirmation Email Error: " . $e->getMessage());
+                }
+                // ----------------------------------------------
             });
             $fulfillmentLog->update(['stage' => 1, 'status' => 'success']);
             Log::info("STAGE 1 OK: Invoice & WebhookLog committed for User #{$userId}, Ref: {$eventId}");
@@ -886,6 +945,21 @@ class BillingController extends Controller
         'status'     => 'pending',
     ]);
 
+    // --- NEW: Alert Admin about manual payment proof ---
+    try {
+        $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.com');
+        \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
+            ->notify(new \App\Notifications\GenericDynamicNotification('admin_manual_payment', [
+                'user' => ['email' => $request->user()->email],
+                'payment' => ['reference' => $request->txid ?: $request->binance_id ?: 'N/A'],
+                'admin_url' => url('/admin/billing/crypto'),
+                'year' => date('Y')
+            ]));
+    } catch (\Exception $e) {
+        \Log::error("Manual Payment Admin Alert Error: " . $e->getMessage());
+    }
+    // ----------------------------------------------------
+
     return response()->json(['message' => 'Transaction submitted for review.', 'data' => $pending]);
 }
 
@@ -936,11 +1010,39 @@ class BillingController extends Controller
                     'reference' => "CRYPTO-" . ($pending->txid ?: $pending->binance_id ?: $pending->id),
                     'description' => "Crypto Top-up ({$pending->currency})",
                 ]);
+
+                // --- NEW: Trigger Payment Accepted Email ---
+                try {
+                    $user->notify(new \App\Notifications\PaymentAcceptedNotification([
+                        'user' => ['name' => $user->name],
+                        'payment' => ['reference' => $pending->txid ?: $pending->binance_id ?: $pending->id],
+                        'action_url' => url('/app/billing'),
+                        'year' => date('Y')
+                    ]));
+                } catch (\Exception $e) {
+                    \Log::error("Payment Accepted Email Error: " . $e->getMessage());
+                }
+            } else {
+                // Trigger Payment Rejected Email
+                try {
+                    $user = User::find($pending->user_id);
+                    if ($user) {
+                        $user->notify(new \App\Notifications\PaymentRejectedNotification([
+                            'user' => ['name' => $user->name],
+                            'payment' => ['reference' => $pending->txid ?: $pending->binance_id ?: $pending->id],
+                            'reject_reason' => $request->admin_note ?: 'Proof could not be verified.',
+                            'action_url' => url('/app/billing'),
+                            'year' => date('Y')
+                        ]));
+                    }
+                } catch (\Exception $e) {
+                    \Log::error("Payment Rejected Email Error: " . $e->getMessage());
+                }
             }
         });
 
         return response()->json(['message' => "Transaction {$request->status} successfully."]);
-    }
+}
 
     /**
      * Create a Stripe Checkout Session in 'setup' mode to save a card.

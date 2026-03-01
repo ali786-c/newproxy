@@ -138,6 +138,20 @@ class ProxyController extends Controller
                 // Trigger auto top-up check if enabled
                 app(\App\Http\Controllers\BillingController::class)->checkAndTriggerAutoTopUp($user);
 
+                // --- NEW: Trigger Proxy Created Email ---
+                try {
+                    $user->notify(new \App\Notifications\ProxyCreatedNotification([
+                        'user' => ['name' => $user->name],
+                        'product' => ['name' => $product->name],
+                        'order' => ['id' => $order->id],
+                        'action_url' => url('/app/proxies'),
+                        'year' => date('Y')
+                    ]));
+                } catch (\Exception $e) {
+                    \Log::error("Proxy Created Email Error: " . $e->getMessage());
+                }
+                // ----------------------------------------
+
                 return response()->json([
                     'message' => 'Proxies generated successfully.',
                     'proxies' => collect($proxies)->map(fn($p) => [
