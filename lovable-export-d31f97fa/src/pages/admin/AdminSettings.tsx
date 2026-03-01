@@ -102,7 +102,7 @@ export default function AdminSettings() {
               <Input
                 value={form.admin_notification_email || ""}
                 onChange={(e) => updateField("admin_notification_email", e.target.value)}
-                placeholder="admin@upgradedproxy.io"
+                placeholder="aliyantarar4@gmail.com"
               />
             </div>
             <div className="flex items-center justify-between pt-2">

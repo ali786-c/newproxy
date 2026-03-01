@@ -68,7 +68,7 @@ class SupportController extends Controller
             ]));
 
             // 2. Alert Admin about new ticket
-            $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.io');
+            $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'aliyantarar4@gmail.com');
             \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
                 ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_ticket', [
                     'user' => ['email' => $user->email],
