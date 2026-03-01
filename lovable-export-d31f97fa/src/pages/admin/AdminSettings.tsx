@@ -44,6 +44,7 @@ export default function AdminSettings() {
     const allowedKeys = [
       'site_name',
       'support_email',
+      'admin_notification_email',
       'maintenance_mode',
       'smtp_host',
       'smtp_port',
@@ -94,6 +95,14 @@ export default function AdminSettings() {
                 value={form.support_email || ""}
                 onChange={(e) => updateField("support_email", e.target.value)}
                 placeholder="support@upgradedproxy.com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Admin Notification Email (for alerts)</Label>
+              <Input
+                value={form.admin_notification_email || ""}
+                onChange={(e) => updateField("admin_notification_email", e.target.value)}
+                placeholder="admin@upgradedproxy.io"
               />
             </div>
             <div className="flex items-center justify-between pt-2">

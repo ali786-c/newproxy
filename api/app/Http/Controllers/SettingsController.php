@@ -13,6 +13,7 @@ class SettingsController extends Controller
     protected $allowedKeys = [
         'site_name',
         'support_email',
+        'admin_notification_email',
         'maintenance_mode',
         'smtp_host',
         'smtp_port',
