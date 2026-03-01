@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { clientApi } from "@/lib/api/dashboard";
+import { SEOHead } from "@/components/seo/SEOHead";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
