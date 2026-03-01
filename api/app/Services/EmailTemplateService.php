@@ -24,6 +24,14 @@ class EmailTemplateService
             return $this->getFallbackRender($key, $data);
         }
 
+        return $this->renderTemplate($template, $data);
+    }
+
+    /**
+     * Render a template object with provided data.
+     */
+    public function renderTemplate(EmailTemplate $template, array $data = []): array
+    {
         $subject = $this->replacePlaceholders($template->subject, $data);
         $bodyContent = $this->replacePlaceholders($template->body, $data);
 
@@ -31,13 +39,15 @@ class EmailTemplateService
         if ($template->format === 'markdown') {
             $htmlBody = Markdown::parse($bodyContent)->toHtml();
         } else {
+            // Check if it's already a full HTML or just a fragment
+            // If it's HTML format, we assume the user provides what they want.
             $htmlBody = $bodyContent;
         }
 
         return [
             'subject' => $subject,
             'html'    => $htmlBody,
-            'body'    => $bodyContent, // Plain text or raw markdown
+            'body'    => $bodyContent,
         ];
     }
 

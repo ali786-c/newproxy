@@ -131,7 +131,7 @@ class EmailTemplateController extends Controller
         // but we can mock a temporary model or just use the logic.
         // For simplicity, we'll use the service's rendering logic.
         
-        $render = $this->service->render($template->key, $dummyData);
+        $render = $this->service->renderTemplate($template, $dummyData);
 
         return response()->json($render);
     }
