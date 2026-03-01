@@ -100,7 +100,7 @@ Route::get('/blog', [\App\Http\Controllers\BlogController::class, 'publicIndex']
 Route::get('/blog/{slug}', [\App\Http\Controllers\BlogController::class, 'show']);
 
 // Temporarily public for manual verification (Phase 3)
-Route::match(['GET', 'POST'], '/email-templates/{id}/preview', [\App\Http\Controllers\Api\Admin\EmailTemplateController::class, 'preview']);
+Route::match(['GET', 'POST'], '/admin/email-templates/{id}/preview', [\App\Http\Controllers\Api\Admin\EmailTemplateController::class, 'preview']);
 
 // ─────────────────────────────────────────────
 // Admin Routes
