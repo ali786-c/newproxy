@@ -38,6 +38,29 @@ class EmailTemplateController extends Controller
     }
 
     /**
+     * Store a newly created template.
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'key' => 'required|string|max:100|unique:email_templates',
+            'name' => 'required|string|max:255',
+            'subject' => 'required|string|max:255',
+            'body' => 'required|string',
+            'format' => 'in:markdown,html',
+            'description' => 'nullable|string',
+            'variables' => 'nullable|array',
+        ]);
+
+        $template = EmailTemplate::create($request->all());
+
+        return response()->json([
+            'message' => 'Template created successfully.',
+            'template' => $template
+        ], 201);
+    }
+
+    /**
      * Update the specified template.
      */
     public function update(Request $request, $id)
@@ -59,6 +82,20 @@ class EmailTemplateController extends Controller
             'message' => 'Template updated successfully.',
             'template' => $template
         ]);
+    }
+
+    /**
+     * Remove the specified template.
+     */
+    public function destroy($id)
+    {
+        $template = is_numeric($id) 
+            ? EmailTemplate::findOrFail($id) 
+            : EmailTemplate::where('key', $id)->firstOrFail();
+            
+        $template->delete();
+
+        return response()->json(['message' => 'Template deleted successfully.']);
     }
 
     /**

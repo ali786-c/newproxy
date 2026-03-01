@@ -194,9 +194,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::post('/referrals/influencer-rate', [\App\Http\Controllers\AdminController::class, 'updateInfluencerRate']);
 
     // Admin Email Templates Management
-    Route::get('/email-templates', [\App\Http\Controllers\Api\Admin\EmailTemplateController::class, 'index']);
-    Route::get('/email-templates/{id}', [\App\Http\Controllers\Api\Admin\EmailTemplateController::class, 'show']);
-    Route::put('/email-templates/{id}', [\App\Http\Controllers\Api\Admin\EmailTemplateController::class, 'update']);
+    Route::apiResource('email-templates', \App\Http\Controllers\Api\Admin\EmailTemplateController::class);
     Route::match(['GET', 'POST'], '/email-templates/{id}/preview', [\App\Http\Controllers\Api\Admin\EmailTemplateController::class, 'preview']);
     Route::post('/email-templates/{id}/test', [\App\Http\Controllers\Api\Admin\EmailTemplateController::class, 'testSend']);
 });

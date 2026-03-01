@@ -19,7 +19,9 @@ import {
     ArrowLeft,
     Info,
     CheckCircle2,
-    XCircle
+    XCircle,
+    Plus,
+    Trash2
 } from "lucide-react";
 import {
     Dialog,
@@ -27,6 +29,7 @@ import {
     DialogHeader,
     DialogTitle,
     DialogFooter,
+    DialogDescription,
 } from "@/components/ui/dialog";
 import {
     Tabs,
@@ -59,9 +62,31 @@ export default function AdminEmailTemplates() {
     const [isTestSendOpen, setIsTestSendOpen] = useState(false);
     const [testEmail, setTestEmail] = useState("");
 
+    // Create State
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [newTemplate, setNewTemplate] = useState({
+        key: "",
+        name: "",
+        subject: "",
+        body: "# Welcome!\n\nNew template content here.",
+        format: "markdown",
+        description: ""
+    });
+
     const { data: templates = [], isLoading } = useQuery({
         queryKey: ["admin-email-templates"],
         queryFn: () => api.get("/admin/email-templates", z.array(EmailTemplateSchema)),
+    });
+
+    const createMutation = useMutation({
+        mutationFn: (data: any) => api.post("/admin/email-templates", z.any(), data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-email-templates"] });
+            toast({ title: "Created", description: "New template added successfully." });
+            setIsCreateOpen(false);
+            setNewTemplate({ key: "", name: "", subject: "", body: "# Welcome!\n\nNew template content here.", format: "markdown", description: "" });
+        },
+        onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
     });
 
     const updateMutation = useMutation({
@@ -70,6 +95,15 @@ export default function AdminEmailTemplates() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin-email-templates"] });
             toast({ title: "Success", description: "Template updated successfully." });
+        },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (key: string) => api.delete(`/admin/email-templates/${key}`, z.any()),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["admin-email-templates"] });
+            toast({ title: "Deleted", description: "Template removed." });
+            setSelectedTemplate(null);
         },
     });
 
@@ -115,6 +149,13 @@ export default function AdminEmailTemplates() {
         });
     };
 
+    const handleDelete = () => {
+        if (!selectedTemplate) return;
+        if (confirm("Are you sure you want to delete this template? This cannot be undone.")) {
+            deleteMutation.mutate(selectedTemplate.key);
+        }
+    };
+
     if (isLoading) return <div className="p-8 text-center">Loading templates...</div>;
 
     if (selectedTemplate) {
@@ -141,6 +182,9 @@ export default function AdminEmailTemplates() {
                         </Button>
                         <Button onClick={handleSave} disabled={updateMutation.isPending}>
                             <Save className="mr-2 h-4 w-4" /> Save Changes
+                        </Button>
+                        <Button variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={handleDelete}>
+                            <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
                 </div>
@@ -207,6 +251,10 @@ export default function AdminEmailTemplates() {
                                         checked={!!selectedTemplate.is_active}
                                         onCheckedChange={v => setSelectedTemplate({ ...selectedTemplate, is_active: v })}
                                     />
+                                </div>
+                                <div className="space-y-1.5 pt-2 border-t">
+                                    <Label className="text-xs">Technical Key</Label>
+                                    <code className="block text-[10px] bg-muted p-1 rounded font-mono">{selectedTemplate.key}</code>
                                 </div>
                             </CardContent>
                         </Card>
@@ -278,14 +326,19 @@ export default function AdminEmailTemplates() {
                         <h1 className="text-2xl font-bold">Email Templates</h1>
                         <p className="text-sm text-muted-foreground">Manage automated system notifications and branding.</p>
                     </div>
-                    <div className="relative w-full sm:w-64">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search templates..."
-                            className="pl-9"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                    <div className="flex items-center gap-2">
+                        <div className="relative w-64">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search templates..."
+                                className="pl-9"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <Button onClick={() => setIsCreateOpen(true)}>
+                            <Plus className="mr-2 h-4 w-4" /> Create New
+                        </Button>
                     </div>
                 </div>
 
@@ -316,8 +369,49 @@ export default function AdminEmailTemplates() {
                             </div>
                         </Card>
                     ))}
+                    {filteredTemplates.length === 0 && (
+                        <div className="col-span-full p-12 text-center border rounded-lg border-dashed">
+                            <Mail className="h-10 w-10 mx-auto text-muted-foreground/50 mb-4" />
+                            <h3 className="text-lg font-medium">No templates found</h3>
+                            <p className="text-sm text-muted-foreground">Try adjusting your search or create a new template.</p>
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Create Template Dialog */}
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Create New Email Template</DialogTitle>
+                        <DialogDescription>Define a new template. You'll need to hook this key into your backend logic.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label>Template Name (Internal)</Label>
+                            <Input placeholder="e.g. Order Received" value={newTemplate.name} onChange={e => setNewTemplate({ ...newTemplate, name: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Technical Key (Unique)</Label>
+                            <Input placeholder="e.g. order_received" value={newTemplate.key} onChange={e => setNewTemplate({ ...newTemplate, key: e.target.value })} />
+                        </div>
+                        <div className="col-span-full space-y-2">
+                            <Label>Subject Line</Label>
+                            <Input placeholder="Your order #{{order.id}} has been received" value={newTemplate.subject} onChange={e => setNewTemplate({ ...newTemplate, subject: e.target.value })} />
+                        </div>
+                        <div className="col-span-full space-y-2">
+                            <Label>Description</Label>
+                            <Input placeholder="Sent when a customer makes a successful purchase." value={newTemplate.description} onChange={e => setNewTemplate({ ...newTemplate, description: e.target.value })} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                        <Button disabled={!newTemplate.key || !newTemplate.name || createMutation.isPending} onClick={() => createMutation.mutate(newTemplate)}>
+                            {createMutation.isPending ? "Creating..." : "Save Template"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
