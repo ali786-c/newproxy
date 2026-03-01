@@ -151,18 +151,21 @@ class ProxyController extends Controller
                 $proxies = $orderData['proxies'];
                 $user = $orderData['user'];
 
-                // 1. Notify User (Using direct route to avoid serialization issues)
+                // 1. Notify User
+                \Illuminate\Support\Facades\Log::info("ORDER_NOTIF: Sending User Email to: " . $user->email);
                 \Illuminate\Support\Facades\Notification::route('mail', $user->email)
-                    ->notify(new \App\Notifications\ProxyCreatedNotification([
-                    'user' => ['name' => $user->name],
-                    'product' => ['name' => $product->name],
-                    'order' => ['id' => $order->id],
-                    'action_url' => url('/app/proxies'),
-                    'year' => date('Y')
-                ]));
+                    ->notify(new \App\Notifications\GenericDynamicNotification('proxy_created_user', [
+                        'user' => ['name' => $user->name],
+                        'product' => ['name' => $product->name],
+                        'order' => ['id' => $order->id],
+                        'action_url' => url('/app/proxies'),
+                        'year' => date('Y')
+                    ]));
+                \Illuminate\Support\Facades\Log::info("ORDER_NOTIF: User notification call finished.");
 
                 // 2. Alert Admin
                 $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'aliyantarar4@gmail.com');
+                \Illuminate\Support\Facades\Log::info("ORDER_NOTIF: Sending Admin Alert to: " . $adminEmail);
                 \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
                     ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_order', [
                         'user' => ['email' => $user->email],
@@ -173,9 +176,11 @@ class ProxyController extends Controller
                         'admin_url' => url('/admin/billing'),
                         'year' => date('Y')
                     ]));
+                \Illuminate\Support\Facades\Log::info("ORDER_NOTIF: Admin alert finished.");
 
             } catch (\Exception $e) {
-                \Log::error("Proxy Delivery Email Error: " . $e->getMessage());
+                \Illuminate\Support\Facades\Log::error("ORDER_NOTIF: Proxy Delivery Email Error: " . $e->getMessage());
+                \Illuminate\Support\Facades\Log::error($e->getTraceAsString());
             }
             // ---------------------------------------------------------------
 
