@@ -31,7 +31,7 @@ class PasswordResetController extends Controller
         try {
             $user->notify(new \App\Notifications\ResetPasswordNotification([
                 'user' => ['name' => $user->name],
-                'reset_url' => url('/reset-password?token=' . $token . '&email=' . $user->email),
+                'action_url' => url('/reset-password?token=' . $token . '&email=' . $user->email),
                 'year' => date('Y')
             ]));
         } catch (\Exception $e) {
