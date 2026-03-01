@@ -83,7 +83,7 @@ class ProxyController extends Controller
             }
 
             // ── Step 4: Deduct balance + create order + save proxies ───────
-            return DB::transaction(function () use ($user, $product, $totalCost, $request, $proxyKey) {
+            $orderData = DB::transaction(function () use ($user, $product, $totalCost, $request, $proxyKey) {
 
                 $user->balance -= $totalCost;
                 $user->save();
@@ -138,32 +138,57 @@ class ProxyController extends Controller
                 // Trigger auto top-up check if enabled
                 app(\App\Http\Controllers\BillingController::class)->checkAndTriggerAutoTopUp($user);
 
-                // --- NEW: Trigger Proxy Created Email ---
-                try {
-                    $user->notify(new \App\Notifications\ProxyCreatedNotification([
-                        'user' => ['name' => $user->name],
-                        'product' => ['name' => $product->name],
-                        'order' => ['id' => $order->id],
-                        'action_url' => url('/app/proxies'),
+                return [
+                    'order'   => $order,
+                    'proxies' => $proxies,
+                    'user'    => $user
+                ];
+            });
+
+            // --- NEW: Trigger Proxy Created Emails (Outside Transaction) ---
+            try {
+                $order = $orderData['order'];
+                $proxies = $orderData['proxies'];
+                $user = $orderData['user'];
+
+                // 1. Notify User
+                $user->notify(new \App\Notifications\ProxyCreatedNotification([
+                    'user' => ['name' => $user->name],
+                    'product' => ['name' => $product->name],
+                    'order' => ['id' => $order->id],
+                    'action_url' => url('/app/proxies'),
+                    'year' => date('Y')
+                ]));
+
+                // 2. Alert Admin
+                $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'aliyantarar4@gmail.com');
+                \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
+                    ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_order', [
+                        'user' => ['email' => $user->email],
+                        'order' => [
+                            'id' => $order->id,
+                            'amount' => '$' . number_format($totalCost, 2)
+                        ],
+                        'admin_url' => url('/admin/billing'),
                         'year' => date('Y')
                     ]));
-                } catch (\Exception $e) {
-                    \Log::error("Proxy Created Email Error: " . $e->getMessage());
-                }
-                // ----------------------------------------
 
-                return response()->json([
-                    'message' => 'Proxies generated successfully.',
-                    'proxies' => collect($proxies)->map(fn($p) => [
-                        'host'     => $p->host,
-                        'port'     => (int) $p->port,
-                        'username' => $p->username,
-                        'password' => $p->password,
-                    ]),
-                    'expires_at' => $order->expires_at,
-                    'balance' => $user->balance,
-                ]);
-            });
+            } catch (\Exception $e) {
+                \Log::error("Proxy Delivery Email Error: " . $e->getMessage());
+            }
+            // ---------------------------------------------------------------
+
+            return response()->json([
+                'message' => 'Proxies generated successfully.',
+                'proxies' => collect($orderData['proxies'])->map(fn($p) => [
+                    'host'     => $p->host,
+                    'port'     => (int) $p->port,
+                    'username' => $p->username,
+                    'password' => $p->password,
+                ]),
+                'expires_at' => $orderData['order']->expires_at,
+                'balance' => $orderData['user']->balance,
+            ]);
 
         } catch (\Exception $e) {
             Log::error('ProxyController Generate Error: ' . $e->getMessage());
