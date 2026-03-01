@@ -62,6 +62,30 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // --- NEW: Trigger Dynamic Emails ---
+        try {
+            $user->notify(new \App\Notifications\WelcomeNotification([
+                'user' => ['name' => $user->name],
+                'app' => ['name' => \App\Models\Setting::getValue('app_name', 'UpgradedProxy')],
+                'action_url' => url('/login'),
+                'year' => date('Y')
+            ]));
+
+            // Admin Alert
+            \Illuminate\Support\Facades\Notification::route('mail', \App\Models\Setting::getValue('admin_email', 'admin@upgradedproxy.io'))
+                ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_user', [
+                    'user' => [
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'signup_ip' => $user->signup_ip
+                    ],
+                    'year' => date('Y')
+                ]));
+        } catch (\Exception $e) {
+            \Log::error("Registration Email Error: " . $e->getMessage());
+        }
+        // ------------------------------------
+
         return response()->json([
             'user'  => $this->formatUser($user),
             'token' => $token,

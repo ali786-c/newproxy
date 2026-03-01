@@ -477,7 +477,7 @@ class BillingController extends Controller
                     ]));
                     
                     // Alert Admin
-                    $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.com');
+                    $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.io');
                     \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
                         ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_order', [
                             'user' => ['email' => $user->email],
@@ -834,7 +834,7 @@ class BillingController extends Controller
                     ]));
 
                     // Alert Admin
-                    $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.com');
+                    $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.io');
                     \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
                         ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_order', [
                             'user' => ['email' => $user->email],
@@ -947,7 +947,7 @@ class BillingController extends Controller
 
     // --- NEW: Alert Admin about manual payment proof ---
     try {
-        $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.com');
+        $adminEmail = \App\Models\Setting::getValue('admin_notification_email', 'admin@upgradedproxy.io');
         \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
             ->notify(new \App\Notifications\GenericDynamicNotification('admin_manual_payment', [
                 'user' => ['email' => $request->user()->email],
