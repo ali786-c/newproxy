@@ -12,20 +12,34 @@ class NotificationController extends Controller
      */
     public function index(Request $request)
     {
-        $limit = $request->query('limit', 20);
-        $notifications = $request->user()->notifications()->latest()->limit($limit)->get();
+        try {
+            $limit = $request->query('limit', 20);
+            $notifications = $request->user()->notifications()->latest()->limit($limit)->get();
 
-        return response()->json($notifications->map(function ($n) {
-            return [
-                'id'         => $n->id,
-                'type'       => $n->data['type'] ?? 'alert',
-                'title'      => $n->data['title'] ?? 'Notification',
-                'message'    => $n->data['message'] ?? '',
-                'read'       => !is_null($n->read_at),
-                'created_at' => $n->created_at->toIso8601String(),
-                'time'       => $n->created_at->diffForHumans(),
-            ];
-        }));
+            return response()->json($notifications->map(function ($n) {
+                // Defensive check: ensure data is an array
+                $data = $n->data;
+                if (is_string($data)) {
+                    $data = json_decode($data, true) ?? [];
+                }
+
+                return [
+                    'id'         => $n->id,
+                    'type'       => $data['type'] ?? 'alert',
+                    'title'      => $data['title'] ?? 'Notification',
+                    'message'    => $data['message'] ?? '',
+                    'read'       => !is_null($n->read_at),
+                    'created_at' => $n->created_at->toIso8601String(),
+                    'time'       => $n->created_at->diffForHumans(),
+                ];
+            }));
+        } catch (\Exception $e) {
+            \Log::error('Notifications Fetch Error: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['error' => 'Internal Server Error'], 500);
+        }
     }
 
     /**
