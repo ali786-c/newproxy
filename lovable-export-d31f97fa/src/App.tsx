@@ -148,7 +148,9 @@ const App = () => (
                             path="/app"
                             element={
                               <RequireAuth>
-                                <AppShell />
+                                <RequireRole role="client">
+                                  <AppShell />
+                                </RequireRole>
                               </RequireAuth>
                             }
                           >

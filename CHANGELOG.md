@@ -5,6 +5,34 @@ All changes are logged here in reverse chronological order (newest first).
 
 ---
 
+## 2026-03-02
+
+### Critical Fixes & Hardening 🛠️
+- **Manual Payment Fix:** Resolved `Class 'App\Http\Controllers\Request' does not exist` error in `BillingController`.
+- **Frontend Stability:** Fixed a `ReferenceError: SEOHead is not defined` on the Forgot Password page by adding missing imports in `ForgotPassword.tsx`.
+- **Password Reset Logic:** Fixed a variable mismatch (`reset_url` vs `action_url`) between the controller and the dynamic templates.
+- **Frontend Build**: Performed a complete production build (`npm run build`) and deployed to `htdocs/`.
+- **Git Synchronization:** Performed a comprehensive push of all source and build changes to GitHub.
+
+## 2026-03-01
+
+### Feature: Premium Dynamic Email System 📧
+- **Dynamic Template Engine:** Switched from hardcoded notifications to a database-driven system using the `email_templates` table.
+- **Unified Branding:** Implemented a new premium HTML base layout (Dark Mode) with professional headers and footers.
+- **Automated Triggers:** Integrated dynamic email triggers across the entire application:
+    - **Welcome & Auth:** New user registration (User welcome + Admin alerts).
+    - **Support Tickets:** Ticket opened confirmations and staff reply notifications.
+    - **Proxy Orders:** Instant "Proxy Ready" emails with full order details.
+    - **Manual Payments:** Admin alert for new proof submissions + User alerts for status updates (Approve/Reject).
+    - **Security:** Password reset links and change confirmations.
+- **Reliability Enhancements:**
+    - **Synchronous Sending:** Disabled queuing for notifications to ensure IMMEDIATE delivery on environments like cPanel/XAMPP.
+    - **Direct Routing:** Bypassed Laravel's default model serialization to prevent "Serializable" errors during email dispatch.
+    - **Admin Alerts:** Standardized the `admin_notification_email` setting, configurable via the Admin Panel.
+- **Code Refactor**: Moved all email notification triggers outside of `DB::transaction` blocks to ensure reliability.
+
+---
+
 ## 2026-02-22
 
 ### Feature: Real Data Integration (Phase 4) 📊
