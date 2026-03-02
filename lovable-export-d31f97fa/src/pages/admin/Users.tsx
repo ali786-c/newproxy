@@ -1,18 +1,15 @@
 import { useState } from "react";
 import { SEOHead } from "@/components/seo/SEOHead";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
-import { Search, ShieldOff, Shield, Plus, Minus, Package, Key, TicketIcon, DollarSign } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, MessageSchema } from "@/lib/api/client";
+import { Search } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api/client";
 import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 
 const UserSchema = z.object({
   id: z.number(),
@@ -29,7 +26,6 @@ function useAdminUsers() {
     queryKey: ["admin-users"],
     queryFn: async () => {
       const data = await api.get("/admin/users", z.array(UserSchema));
-      // Map Laravel User to what UI expects
       return data.map((u: any) => ({
         ...u,
         full_name: u.name,
@@ -41,59 +37,10 @@ function useAdminUsers() {
   });
 }
 
-function useAdminAction() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (params: { action: string;[key: string]: any }) => {
-      const { action, ...payload } = params;
-      if (action === "list_users") return api.get("/admin/users", z.array(UserSchema));
-      if (action === "ban_user" || action === "unban_user") {
-        return api.post("/admin/users/ban", MessageSchema, {
-          user_id: payload.user_id,
-          reason: payload.ban_reason || (action === "ban_user" ? "Banned by admin" : "Unbanned by admin"),
-        });
-      }
-      if (action === "update_influencer_rate") {
-        return api.post("/admin/referrals/influencer-rate", MessageSchema, {
-          user_id: payload.user_id,
-          custom_rate: payload.custom_rate,
-        });
-      }
-      if (action === "adjust_balance") {
-        return api.post("/admin/users/balance", z.object({ message: z.string(), new_balance: z.number() }), {
-          user_id: payload.user_id,
-          amount: payload.amount,
-          reason: payload.reason || "Admin adjustment",
-        });
-      }
-      if (action === "get_user_stats") {
-        // This one might need more work if we want detailed per-user stats
-        return api.get("/admin/stats", z.any());
-      }
-      throw new Error("Action not supported in Laravel bridge");
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
-  });
-}
-
-function useUserStats(userId: string | null) {
-  return useQuery({
-    queryKey: ["admin-user-stats", userId],
-    enabled: !!userId,
-    queryFn: async () => {
-      return api.get(`/admin/users/${userId}/stats`, z.any());
-    },
-  });
-}
-
 export default function AdminUsers() {
+  const navigate = useNavigate();
   const { data: users, isLoading } = useAdminUsers();
-  const adminAction = useAdminAction();
   const [search, setSearch] = useState("");
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [balanceAmount, setBalanceAmount] = useState("");
-  const [balanceReason, setBalanceReason] = useState("");
-  const { data: userStats } = useUserStats(selectedUser?.user_id ?? null);
 
   if (isLoading) return <LoadingSkeleton />;
 
@@ -101,42 +48,6 @@ export default function AdminUsers() {
     if (search && !u.email?.toLowerCase().includes(search.toLowerCase()) && !u.full_name?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
-
-  const handleBan = async (userId: string, isBanned: boolean) => {
-    try {
-      await adminAction.mutateAsync({
-        action: isBanned ? "unban_user" : "ban_user",
-        user_id: userId,
-        ban_reason: isBanned ? undefined : "Violated terms of service",
-      });
-      setSelectedUser(null);
-      toast({ title: isBanned ? "User unbanned" : "User banned" });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
-
-  const handleBalanceAdjust = async (isTopUp: boolean) => {
-    const amount = parseFloat(balanceAmount);
-    if (!amount || amount <= 0) {
-      toast({ title: "Invalid amount", variant: "destructive" });
-      return;
-    }
-    try {
-      const result = await adminAction.mutateAsync({
-        action: "adjust_balance",
-        user_id: selectedUser.user_id,
-        amount: isTopUp ? amount : -amount,
-        reason: balanceReason || (isTopUp ? "Admin top-up" : "Admin deduction"),
-      });
-      setBalanceAmount("");
-      setBalanceReason("");
-      setSelectedUser((prev: any) => prev ? { ...prev, balance: result.new_balance } : null);
-      toast({ title: `Balance ${isTopUp ? "topped up" : "deducted"} successfully` });
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
 
   const totalUsers = (users ?? []).length;
   const bannedUsers = (users ?? []).filter((u: any) => u.is_banned).length;
@@ -195,7 +106,11 @@ export default function AdminUsers() {
               </TableHeader>
               <TableBody>
                 {filtered.map((user: any) => (
-                  <TableRow key={user.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedUser(user)}>
+                  <TableRow
+                    key={user.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/admin/users/${user.id}`)}
+                  >
                     <TableCell>
                       <div>
                         <p className="font-medium">{user.full_name || "—"}</p>
@@ -221,7 +136,7 @@ export default function AdminUsers() {
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">No users found.</TableCell>
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No users found.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -229,161 +144,6 @@ export default function AdminUsers() {
           </CardContent>
         </Card>
       </div>
-
-      <Sheet open={!!selectedUser} onOpenChange={() => { setSelectedUser(null); setBalanceAmount(""); setBalanceReason(""); }}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          {selectedUser && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{selectedUser.full_name || "User"}</SheetTitle>
-                <SheetDescription>{selectedUser.email}</SheetDescription>
-              </SheetHeader>
-              <div className="mt-6 space-y-5">
-                {/* Basic Info */}
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><p className="text-muted-foreground">Role</p><p className="font-medium capitalize">{selectedUser.user_roles?.[0]?.role ?? "client"}</p></div>
-                  <div><p className="text-muted-foreground">Status</p><Badge variant={selectedUser.is_banned ? "destructive" : "default"}>{selectedUser.is_banned ? "Banned" : "Active"}</Badge></div>
-                  <div><p className="text-muted-foreground">Balance</p><p className="font-medium text-lg">${Number(selectedUser.balance ?? 0).toFixed(2)}</p></div>
-                  <div><p className="text-muted-foreground">Joined</p><p className="font-medium">{new Date(selectedUser.created_at).toLocaleDateString()}</p></div>
-                </div>
-
-                {/* User Stats */}
-                {userStats && (
-                  <div className="rounded-lg border p-4 space-y-3">
-                    <p className="text-sm font-semibold">User Statistics</p>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-muted-foreground">Total Spent</p>
-                          <p className="font-medium">€{userStats.total_spent?.toFixed(2) ?? "0.00"}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-muted-foreground">Orders</p>
-                          <p className="font-medium">{userStats.active_orders ?? 0} active / {userStats.total_orders ?? 0} total</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Key className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-muted-foreground">API Keys</p>
-                          <p className="font-medium">{userStats.active_keys ?? 0} active / {userStats.total_keys ?? 0} total</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <TicketIcon className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-muted-foreground">Tickets</p>
-                          <p className="font-medium">{userStats.open_tickets ?? 0} open / {userStats.total_tickets ?? 0} total</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedUser.ban_reason && (
-                  <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                    <strong>Ban reason:</strong> {selectedUser.ban_reason}
-                  </div>
-                )}
-
-                {/* Balance Adjustment */}
-                <div className="border-t pt-4 space-y-3">
-                  <p className="text-sm font-semibold">Adjust Balance</p>
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Amount ($)</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      placeholder="e.g. 50.00"
-                      value={balanceAmount}
-                      onChange={(e) => setBalanceAmount(e.target.value)}
-                    />
-                    <Label htmlFor="reason">Reason (optional)</Label>
-                    <Input
-                      id="reason"
-                      placeholder="e.g. Manual credit for support case"
-                      value={balanceReason}
-                      onChange={(e) => setBalanceReason(e.target.value)}
-                    />
-                    <div className="flex gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        onClick={() => handleBalanceAdjust(true)}
-                        disabled={adminAction.isPending || !balanceAmount}
-                        className="flex-1"
-                      >
-                        <Plus className="mr-1 h-4 w-4" /> Top Up
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleBalanceAdjust(false)}
-                        disabled={adminAction.isPending || !balanceAmount}
-                        className="flex-1"
-                      >
-                        <Minus className="mr-1 h-4 w-4" /> Deduct
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Ban/Unban */}
-                <div className="border-t pt-4 space-y-3">
-                  <p className="text-sm font-semibold">Access Control</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={selectedUser.is_banned ? "default" : "destructive"}
-                      size="sm"
-                      onClick={() => handleBan(selectedUser.user_id, selectedUser.is_banned)}
-                      disabled={adminAction.isPending}
-                    >
-                      {selectedUser.is_banned ? <Shield className="mr-2 h-4 w-4" /> : <ShieldOff className="mr-2 h-4 w-4" />}
-                      {selectedUser.is_banned ? "Unban User" : "Ban User"}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Influencer Control */}
-                <div className="border-t pt-4 space-y-3">
-                  <p className="text-sm font-semibold">Influencer Settings</p>
-                  <div className="space-y-2">
-                    <Label>Custom Referral Rate (%)</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        placeholder="e.g. 15"
-                        defaultValue={selectedUser.custom_referral_rate || ""}
-                        onBlur={async (e) => {
-                          const rate = e.target.value === "" ? null : parseFloat(e.target.value);
-                          if (rate !== selectedUser.custom_referral_rate) {
-                            try {
-                              await adminAction.mutateAsync({
-                                action: "update_influencer_rate",
-                                user_id: selectedUser.user_id,
-                                custom_rate: rate,
-                              });
-                              toast({ title: "Influencer rate updated" });
-                            } catch (err: any) {
-                              toast({ title: "Error", description: err.message, variant: "destructive" });
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">Set a custom rate for this specific user. Leave empty for default.</p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </>
   );
 }

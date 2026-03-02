@@ -657,3 +657,116 @@ export function useNotifications() {
 
   return { ...query, markRead, markAllRead };
 }
+
+export function useAdminUserDetail(id: string | number | null) {
+  return useQuery({
+    queryKey: ["admin", "users", id],
+    queryFn: async () => {
+      if (!id) return null;
+      const users = await api.get("/admin/users", z.array(z.any()));
+      const user = users.find((u: any) => String(u.id) === String(id));
+      if (!user) throw new Error("User not found");
+      return {
+        ...user,
+        full_name: user.name,
+        user_id: user.id,
+        is_banned: user.role === "banned",
+      };
+    },
+    enabled: !!id,
+  });
+}
+
+export function useAdminUserOrders(id: string | number | null) {
+  return useQuery({
+    queryKey: ["admin", "users", id, "orders"],
+    queryFn: async () => {
+      return api.get(`/admin/users/${id}/orders`, z.array(z.any()));
+    },
+    enabled: !!id,
+  });
+}
+
+export function useAdminUserActions() {
+  const queryClient = useQueryClient();
+
+  const updatePassword = useMutation({
+    mutationFn: async ({ id, data }: { id: string | number; data: any }) => {
+      return api.post(`/admin/users/${id}/password`, MessageSchema, data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users", variables.id] });
+    },
+  });
+
+  const addOrder = useMutation({
+    mutationFn: async ({ id, data }: { id: string | number; data: any }) => {
+      return api.post(`/admin/users/${id}/orders`, MessageSchema, data);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users", variables.id, "orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-stats", String(variables.id)] });
+    },
+  });
+
+  const deleteOrder = useMutation({
+    mutationFn: async ({ orderId, userId }: { orderId: string | number; userId: string | number }) => {
+      return api.delete(`/admin/orders/${orderId}`, MessageSchema);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users", variables.userId, "orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-stats", String(variables.userId)] });
+    },
+  });
+
+  const updateRole = useMutation({
+    mutationFn: async ({ id, role }: { id: string | number; role: string }) => {
+      return api.post(`/admin/users/${id}/role`, MessageSchema, { role });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+  });
+
+  return { updatePassword, addOrder, deleteOrder, updateRole };
+}
+
+export function useAdminAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { action: string;[key: string]: any }) => {
+      const { action, ...payload } = params;
+      if (action === "list_users") return api.get("/admin/users", z.array(z.any()));
+      if (action === "ban_user" || action === "unban_user") {
+        return api.post("/admin/users/ban", MessageSchema, {
+          user_id: payload.user_id,
+          reason: payload.ban_reason || (action === "ban_user" ? "Banned by admin" : "Unbanned by admin"),
+        });
+      }
+      if (action === "update_influencer_rate") {
+        return api.post("/admin/referrals/influencer-rate", MessageSchema, {
+          user_id: payload.user_id,
+          custom_rate: payload.custom_rate,
+        });
+      }
+      if (action === "adjust_balance") {
+        return api.post("/admin/users/balance", z.object({ message: z.string(), new_balance: z.number() }), {
+          user_id: payload.user_id,
+          amount: payload.amount,
+          reason: payload.reason || "Admin adjustment",
+        });
+      }
+      if (action === "get_user_stats") {
+        return api.get(`/admin/users/${payload.user_id}/stats`, z.any());
+      }
+      throw new Error("Action not supported in Laravel bridge");
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      if (variables.user_id) {
+        queryClient.invalidateQueries({ queryKey: ["admin", "users", variables.user_id] });
+      }
+    },
+  });
+}

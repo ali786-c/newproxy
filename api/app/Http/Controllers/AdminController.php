@@ -11,6 +11,7 @@ use App\Models\UptimeRecord;
 use App\Models\FulfillmentLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
@@ -98,6 +99,118 @@ class AdminController extends Controller
         );
 
         return response()->json(['message' => "Role updated to {$request->role}"]);
+    }
+
+    /**
+     * POST /admin/users/{id}/password - Set new user password
+     */
+    public function updatePassword(Request $request, $id)
+    {
+        $request->validate([
+            'password' => 'required|string|min:8|confirmed'
+        ]);
+
+        $user = User::findOrFail($id);
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        AdminLog::log(
+            'reset_password',
+            "Password manually reset by admin",
+            $user->id
+        );
+
+        return response()->json(['message' => 'Password updated successfully']);
+    }
+
+    /**
+     * GET /admin/users/{id}/orders - List a specific user's orders/proxies
+     */
+    public function getUserOrders($id)
+    {
+        $orders = Order::with('product', 'proxies')
+            ->where('user_id', $id)
+            ->latest()
+            ->get();
+            
+        return response()->json($orders);
+    }
+
+    /**
+     * DELETE /admin/orders/{orderId} - Delete a specific order
+     */
+    public function deleteOrder($orderId)
+    {
+        $order = Order::findOrFail($orderId);
+        $userId = $order->user_id;
+
+        DB::transaction(function() use ($order, $userId) {
+            // Remove associated proxies
+            $order->proxies()->delete();
+            $order->delete();
+
+            AdminLog::log(
+                'delete_order',
+                "Order #{$order->id} and associated proxies deleted by admin.",
+                $userId
+            );
+        });
+
+        return response()->json(['message' => 'Order deleted successfully']);
+    }
+
+    /**
+     * POST /admin/users/{id}/orders - Manually add an order/proxy to a user
+     */
+    public function addUserOrder(Request $request, $id)
+    {
+        $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1|max:100',
+            'days' => 'required|integer|min:1|max:365',
+        ]);
+
+        $user = User::findOrFail($id);
+        $product = \App\Models\Product::findOrFail($request->product_id);
+
+        $order = DB::transaction(function() use ($user, $product, $request) {
+            $order = Order::create([
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+                'status' => 'active',
+                'expires_at' => now()->addDays($request->days),
+                'description' => "Manually assigned by admin"
+            ]);
+
+            // Create placeholder proxies (Host/Port/User/Pass based on product type)
+            // Note: Admin might need real keys, for now use standard pattern.
+            $portMap = ['rp' => 1000, 'mp' => 3000, 'isp' => 3000, 'dc' => 2000];
+            $hostMap = ['rp'  => 'rp.evomi.com', 'mp' => 'mp.evomi.com', 'dc' => 'dcp.evomi.com', 'isp' => 'isp.evomi.com'];
+            
+            $port = $portMap[$product->type] ?? 1000;
+            $host = $hostMap[$product->type] ?? 'gate.evomi.com';
+
+            for ($i = 0; $i < $request->quantity; $i++) {
+                \App\Models\Proxy::create([
+                    'order_id' => $order->id,
+                    'host' => $host,
+                    'port' => $port,
+                    'username' => $user->evomi_username ?: $user->email,
+                    'password' => 'admin_assigned_' . strtolower(\Illuminate\Support\Str::random(8)),
+                    'country' => 'US',
+                ]);
+            }
+
+            AdminLog::log(
+                'add_order_manual',
+                "Manually assigned order #{$order->id} ({$product->name}) for {$request->days} days.",
+                $user->id
+            );
+
+            return $order;
+        });
+
+        return response()->json(['message' => 'Order assigned successfully', 'order' => $order]);
     }
 
     public function stats()

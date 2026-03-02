@@ -91,6 +91,7 @@ const AdminManualPayments = lazy(() => import("./pages/admin/ManualPayments"));
 const AdminReferrals = lazy(() => import("./pages/admin/Referrals"));
 const AdminFulfillmentLogs = lazy(() => import("./pages/admin/FulfillmentLogs"));
 const AdminEmailTemplates = lazy(() => import("./pages/admin/AdminEmailTemplates"));
+const AdminUserDetail = lazy(() => import("./pages/admin/UserDetail"));
 
 const queryClient = new QueryClient();
 
@@ -186,6 +187,7 @@ const App = () => (
                           >
                             <Route index element={<AdminDashboard />} />
                             <Route path="users" element={<AdminUsers />} />
+                            <Route path="users/:id" element={<AdminUserDetail />} />
                             <Route path="products" element={<AdminProducts />} />
                             <Route path="audit" element={<AdminAudit />} />
                             <Route path="blog" element={<AdminBlog />} />

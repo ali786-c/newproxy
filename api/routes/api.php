@@ -124,9 +124,13 @@ Route::get('/blog/{slug}', [\App\Http\Controllers\BlogController::class, 'show']
 Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/users',          [\App\Http\Controllers\AdminController::class, 'users']);
     Route::get('/users/{id}/stats', [\App\Http\Controllers\AdminController::class, 'userStats']);
+    Route::get('/users/{id}/orders', [\App\Http\Controllers\AdminController::class, 'getUserOrders']);
+    Route::post('/users/{id}/orders', [\App\Http\Controllers\AdminController::class, 'addUserOrder']);
     Route::post('/users/balance', [\App\Http\Controllers\AdminController::class, 'updateBalance']);
     Route::post('/users/ban',     [\App\Http\Controllers\AdminController::class, 'banUser']);
     Route::post('/users/{id}/role', [\App\Http\Controllers\AdminController::class, 'updateRole']);
+    Route::post('/users/{id}/password', [\App\Http\Controllers\AdminController::class, 'updatePassword']);
+    Route::delete('/orders/{orderId}', [\App\Http\Controllers\AdminController::class, 'deleteOrder']);
     Route::get('/stats',          [\App\Http\Controllers\AdminController::class, 'stats']);
     Route::get('/logs',           [\App\Http\Controllers\AdminController::class, 'logs']);
     Route::get('/invoices',       [\App\Http\Controllers\BillingController::class, 'adminInvoices']);
