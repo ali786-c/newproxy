@@ -71,8 +71,8 @@ export default function Docs() {
       {/* Hero Section */}
       <section className="container py-16 border-b">
         <div className="max-w-3xl">
-          <Badge className="mb-4" variant="secondary">API V1.0</Badge>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Professional API</h1>
+          <Badge className="mb-4" variant="secondary">API V1.0 Beta</Badge>
+          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Professional API (Beta)</h1>
           <p className="mt-6 text-xl text-muted-foreground leading-relaxed">
             Integrate our high-performance proxy infrastructure directly into your custom applications.
             Automate proxy generation, monitor usage, and manage your balance with simple RESTful endpoints.
