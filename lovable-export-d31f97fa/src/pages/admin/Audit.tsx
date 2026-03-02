@@ -14,16 +14,16 @@ import { z } from "zod";
 const AuditLogSchema = z.object({
   id: z.number(),
   action: z.string(),
-  details: z.string().nullable(),
-  target_user_id: z.number().nullable(),
-  ip_address: z.string().nullable(),
-  user_agent: z.string().nullable(),
-  geo_country: z.string().nullable(),
-  geo_city: z.string().nullable(),
+  details: z.string().nullable().optional(),
+  target_user_id: z.number().nullable().optional(),
+  ip_address: z.string().nullish(),
+  user_agent: z.string().nullish(),
+  geo_country: z.string().nullish(),
+  geo_city: z.string().nullish(),
   created_at: z.string(),
   admin: z.object({
     name: z.string()
-  }).nullable()
+  }).nullable().optional()
 });
 
 const ACTION_COLORS: Record<string, "default" | "destructive" | "secondary" | "outline"> = {
