@@ -158,6 +158,14 @@ class SupportController extends Controller
             }
         }
 
+        if (trim($request->user()->role) === 'admin') {
+            \App\Models\AdminLog::log(
+                'reply_ticket',
+                "Replied to ticket #{$ticket->id}",
+                $ticket->user_id
+            );
+        }
+
         return response()->json($message);
     }
 
@@ -191,6 +199,14 @@ class SupportController extends Controller
 
         $ticket->update(['status' => $request->status]);
 
+        if (trim($request->user()->role) === 'admin') {
+            \App\Models\AdminLog::log(
+                'update_ticket_status',
+                "Changed ticket #{$ticket->id} status to {$request->status}",
+                $ticket->user_id
+            );
+        }
+
         return response()->json($ticket);
     }
 
@@ -206,6 +222,12 @@ class SupportController extends Controller
         $ticket = SupportTicket::findOrFail($id);
         $ticket->messages()->delete();
         $ticket->delete();
+
+        \App\Models\AdminLog::log(
+            'delete_ticket',
+            "Deleted ticket #{$ticket->id} (Subject: {$ticket->subject})",
+            $ticket->user_id
+        );
 
         return response()->json(['message' => 'Ticket deleted successfully']);
     }

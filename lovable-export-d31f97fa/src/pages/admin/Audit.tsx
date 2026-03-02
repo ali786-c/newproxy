@@ -16,6 +16,10 @@ const AuditLogSchema = z.object({
   action: z.string(),
   details: z.string().nullable(),
   target_user_id: z.number().nullable(),
+  ip_address: z.string().nullable(),
+  user_agent: z.string().nullable(),
+  geo_country: z.string().nullable(),
+  geo_city: z.string().nullable(),
   created_at: z.string(),
   admin: z.object({
     name: z.string()
@@ -31,6 +35,13 @@ const ACTION_COLORS: Record<string, "default" | "destructive" | "secondary" | "o
   reply: "secondary",
   create: "default",
   update_balance: "default",
+  update_settings: "secondary",
+  create_email_template: "default",
+  update_email_template: "secondary",
+  delete_email_template: "destructive",
+  reply_ticket: "secondary",
+  update_ticket_status: "secondary",
+  delete_ticket: "destructive",
 };
 
 export default function AdminAudit() {
@@ -46,8 +57,10 @@ export default function AdminAudit() {
         created_at: e.created_at,
         action: e.action,
         target_id: String(e.target_user_id || ""),
-        ip_address: "Internal",
+        ip_address: e.ip_address || "Internal",
         admin_name: e.admin?.name ?? "System",
+        geo_country: e.geo_country,
+        geo_city: e.geo_city,
         metadata: { details: e.details }
       }));
     },
@@ -131,8 +144,8 @@ export default function AdminAudit() {
                           </span>
                         ) : "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
-                        {entry.metadata && Object.keys(entry.metadata as object).length > 0 ? JSON.stringify(entry.metadata) : "—"}
+                      <TableCell className="text-xs text-muted-foreground max-w-[250px] break-words">
+                        {entry.metadata?.details ?? "—"}
                       </TableCell>
                     </TableRow>
                   );

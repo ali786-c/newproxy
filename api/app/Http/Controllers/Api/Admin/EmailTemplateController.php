@@ -54,6 +54,11 @@ class EmailTemplateController extends Controller
 
         $template = EmailTemplate::create($request->all());
 
+        \App\Models\AdminLog::log(
+            'create_email_template',
+            "Created email template: {$template->name} ({$template->key})"
+        );
+
         return response()->json([
             'message' => 'Template created successfully.',
             'template' => $template
@@ -78,6 +83,11 @@ class EmailTemplateController extends Controller
 
         $template->update($request->only(['subject', 'body', 'is_active', 'format']));
 
+        \App\Models\AdminLog::log(
+            'update_email_template',
+            "Updated email template: {$template->name} ({$template->key})"
+        );
+
         return response()->json([
             'message' => 'Template updated successfully.',
             'template' => $template
@@ -93,6 +103,11 @@ class EmailTemplateController extends Controller
             ? EmailTemplate::findOrFail($id) 
             : EmailTemplate::where('key', $id)->firstOrFail();
             
+        \App\Models\AdminLog::log(
+            'delete_email_template',
+            "Deleted email template: {$template->name} ({$template->key})"
+        );
+
         $template->delete();
 
         return response()->json(['message' => 'Template deleted successfully.']);

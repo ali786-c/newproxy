@@ -46,12 +46,11 @@ class AdminController extends Controller
             $target->balance += $request->amount;
             $target->save();
 
-            AdminLog::create([
-                'admin_id' => $admin->id,
-                'action' => 'update_balance',
-                'target_user_id' => $target->id,
-                'details' => "Balance changed from {$oldBalance} to {$target->balance}. Reason: {$request->reason}",
-            ]);
+            AdminLog::log(
+                'update_balance',
+                "Balance changed from {$oldBalance} to {$target->balance}. Reason: {$request->reason}",
+                $target->id
+            );
         });
 
         return response()->json(['message' => 'Balance updated successfully', 'new_balance' => $target->balance]);
@@ -71,12 +70,11 @@ class AdminController extends Controller
         $target->role = $isBanning ? 'banned' : 'client';
         $target->save();
 
-        AdminLog::create([
-            'admin_id' => $admin->id,
-            'action' => $isBanning ? 'ban_user' : 'unban_user',
-            'target_user_id' => $target->id,
-            'details' => ($isBanning ? "User banned. " : "User unbanned. ") . "Reason: {$request->reason}",
-        ]);
+        AdminLog::log(
+            $isBanning ? 'ban_user' : 'unban_user',
+            ($isBanning ? "User banned. " : "User unbanned. ") . "Reason: {$request->reason}",
+            $target->id
+        );
 
         return response()->json(['message' => 'User status updated successfully', 'new_role' => $target->role]);
     }
@@ -93,12 +91,11 @@ class AdminController extends Controller
         $user->role = $request->role;
         $user->save();
 
-        AdminLog::create([
-            'admin_id' => $request->user()->id,
-            'target_user_id' => $user->id,
-            'action' => 'change_role',
-            'details' => "Role changed from {$oldRole} to {$request->role}",
-        ]);
+        AdminLog::log(
+            'change_role',
+            "Role changed from {$oldRole} to {$request->role}",
+            $user->id
+        );
 
         return response()->json(['message' => "Role updated to {$request->role}"]);
     }
@@ -376,12 +373,11 @@ class AdminController extends Controller
         $user->custom_referral_rate = $request->custom_rate;
         $user->save();
 
-        AdminLog::create([
-            'admin_id' => $request->user()->id,
-            'target_user_id' => $user->id,
-            'action' => 'update_influencer_rate',
-            'details' => "Custom referral rate set to " . ($request->custom_rate ?? 'null') . "%",
-        ]);
+        AdminLog::log(
+            'update_influencer_rate',
+            "Custom referral rate set to " . ($request->custom_rate ?? 'null') . "%",
+            $user->id
+        );
 
         return response()->json(['message' => 'Influencer rate updated successfully']);
     }
@@ -397,11 +393,10 @@ class AdminController extends Controller
         $earning->status = $request->status;
         $earning->save();
 
-        AdminLog::create([
-            'admin_id' => $request->user()->id,
-            'action' => 'update_referral_earning_status',
-            'details' => "Referral earning #{$id} status changed from {$oldStatus} to {$request->status}",
-        ]);
+        AdminLog::log(
+            'update_referral_earning_status',
+            "Referral earning #{$id} status changed from {$oldStatus} to {$request->status}"
+        );
 
         return response()->json(['message' => 'Earning status updated successfully']);
     }
