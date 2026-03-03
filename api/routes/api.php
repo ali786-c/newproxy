@@ -3,6 +3,10 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
  
+Route::get('/test-api', function () {
+    return response()->json(['message' => 'API route is working']);
+});
+
 Route::prefix('v1')->middleware(['api_key', 'api_log', 'banned'])->group(function () {
     Route::get('/me/balance', [\App\Http\Controllers\Api\V1\ProxyApiController::class, 'balance'])->name('api.v1.balance');
     Route::get('/products',   [\App\Http\Controllers\Api\V1\ProxyApiController::class, 'products'])->name('api.v1.products');
