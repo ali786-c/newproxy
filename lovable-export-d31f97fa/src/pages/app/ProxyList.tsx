@@ -263,7 +263,7 @@ export default function ProxyList() {
             </div>
 
             <Dialog open={!!selectedProxy} onOpenChange={() => setSelectedProxy(null)}>
-                <DialogContent className="max-w-2xl bg-card border-border/50 shadow-2xl overflow-hidden p-0">
+                <DialogContent className="max-w-3xl bg-card border-border/50 shadow-2xl overflow-hidden p-0">
                     <div className="relative h-2 bg-primary"></div>
                     <div className="p-6 space-y-6">
                         <DialogHeader className="pt-2">
