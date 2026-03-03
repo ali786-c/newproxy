@@ -40,8 +40,15 @@ class GoogleAuthController extends Controller
     public function handleGoogleCallback(Request $request)
     {
         try {
+            Log::info('Google Auth Callback: Start', [
+                'code' => $request->query('code') ? 'present' : 'missing',
+                'ip' => $request->ip()
+            ]);
+            
             // Frontend passes the 'code' obtained from Google
             $googleUser = Socialite::driver('google')->stateless()->user();
+            
+            Log::info('Google Auth Callback: User retrieved', ['email' => $googleUser->email]);
             
             $user = User::where('google_id', $googleUser->id)
                         ->orWhere('email', $googleUser->email)
