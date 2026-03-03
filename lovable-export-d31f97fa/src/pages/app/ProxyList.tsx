@@ -5,12 +5,32 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, Search, LayoutGrid, List as ListIcon, Loader2, Plus } from "lucide-react";
+import { Copy, Download, Search, LayoutGrid, List as ListIcon, Loader2, Plus, Eye, Check, Terminal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOrders } from "@/hooks/use-backend";
 import { toast } from "@/hooks/use-toast";
 import { formatProxyLine } from "@/lib/utils";
+
+function generateCurl(p: any) {
+    return `curl -x http://${p.username}:${p.password}@${p.host}:${p.port} https://httpbin.org/ip`;
+}
+
+function generatePython(p: any) {
+    return `import requests\n\nproxies = {\n    "http": "http://${p.username}:${p.password}@${p.host}:${p.port}",\n    "https": "http://${p.username}:${p.password}@${p.host}:${p.port}",\n}\nresponse = requests.get("https://httpbin.org/ip", proxies=proxies)\nprint(response.json())`;
+}
+
+function generateNode(p: any) {
+    return `const HttpsProxyAgent = require('https-proxy-agent');\n\nconst agent = new HttpsProxyAgent(\n  'http://${p.username}:${p.password}@${p.host}:${p.port}'\n);\n\nfetch('https://httpbin.org/ip', { agent })\n  .then(res => res.json())\n  .then(console.log);`;
+}
 
 const TYPE_LABELS: Record<string, string> = {
     "residential": "Residential Proxies",
@@ -34,6 +54,7 @@ export default function ProxyList() {
     const { data: orders, isLoading } = useOrders(dbType);
     const [search, setSearch] = useState("");
     const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+    const [selectedProxy, setSelectedProxy] = useState<any>(null);
 
     const title = type ? TYPE_LABELS[type] || "Proxies" : "All Proxies";
 
@@ -187,9 +208,14 @@ export default function ProxyList() {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyProxy(p)}>
-                                                        <Copy className="h-4 w-4" />
-                                                    </Button>
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedProxy(p)}>
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyProxy(p)}>
+                                                            <Copy className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -205,9 +231,14 @@ export default function ProxyList() {
                                                 <span className="text-lg">{p.country === 'US' ? '🇺🇸' : p.country === 'GB' ? '🇬🇧' : '🌐'}</span>
                                                 <Badge variant="secondary" className="text-[10px] uppercase font-bold">{type || 'Proxy'}</Badge>
                                             </div>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyProxy(p)}>
-                                                <Copy className="h-3.5 w-3.5" />
-                                            </Button>
+                                            <div className="flex items-center gap-1">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedProxy(p)}>
+                                                    <Eye className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyProxy(p)}>
+                                                    <Copy className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
                                         </div>
                                         <div className="font-mono text-xs p-2 bg-muted rounded truncate">
                                             {p.host}:{p.port}
@@ -230,6 +261,110 @@ export default function ProxyList() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Dialog open={!!selectedProxy} onOpenChange={() => setSelectedProxy(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Terminal className="h-5 w-5 text-primary" />
+                            Proxy Details
+                        </DialogTitle>
+                        <DialogDescription>
+                            Credentials and integration snippets for your {selectedProxy?.product_name || 'proxy'}.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedProxy && (
+                        <div className="space-y-6 pt-4">
+                            {/* Credentials Grid */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5 p-3 rounded-lg border bg-muted/30">
+                                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Host:Port</p>
+                                    <div className="flex items-center justify-between">
+                                        <code className="text-sm">{selectedProxy.host}:{selectedProxy.port}</code>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                                            navigator.clipboard.writeText(`${selectedProxy.host}:${selectedProxy.port}`);
+                                            toast({ title: "Copied", description: "Host:Port copied." });
+                                        }}>
+                                            <Copy className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5 p-3 rounded-lg border bg-muted/30">
+                                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Country</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">{selectedProxy.country === 'US' ? '🇺🇸' : selectedProxy.country === 'GB' ? '🇬🇧' : '🌐'}</span>
+                                        <span className="text-sm font-medium">{selectedProxy.country}</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5 p-3 rounded-lg border bg-muted/30">
+                                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Username</p>
+                                    <div className="flex items-center justify-between">
+                                        <code className="text-sm truncate mr-2">{selectedProxy.username}</code>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                                            navigator.clipboard.writeText(selectedProxy.username);
+                                            toast({ title: "Copied", description: "Username copied." });
+                                        }}>
+                                            <Copy className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5 p-3 rounded-lg border bg-muted/30">
+                                    <p className="text-[10px] font-bold uppercase text-muted-foreground">Password</p>
+                                    <div className="flex items-center justify-between">
+                                        <code className="text-sm truncate mr-2">{selectedProxy.password}</code>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                                            navigator.clipboard.writeText(selectedProxy.password);
+                                            toast({ title: "Copied", description: "Password copied." });
+                                        }}>
+                                            <Copy className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Snippets */}
+                            <Tabs defaultValue="curl">
+                                <TabsList className="grid w-full grid-cols-3">
+                                    <TabsTrigger value="curl">cURL</TabsTrigger>
+                                    <TabsTrigger value="python">Python</TabsTrigger>
+                                    <TabsTrigger value="node">Node.js</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="curl" className="mt-4">
+                                    <SnippetBlock code={generateCurl(selectedProxy)} />
+                                </TabsContent>
+                                <TabsContent value="python" className="mt-4">
+                                    <SnippetBlock code={generatePython(selectedProxy)} />
+                                </TabsContent>
+                                <TabsContent value="node" className="mt-4">
+                                    <SnippetBlock code={generateNode(selectedProxy)} />
+                                </TabsContent>
+                            </Tabs>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </>
+    );
+}
+
+function SnippetBlock({ code }: { code: string }) {
+    return (
+        <div className="relative group">
+            <pre className="p-4 rounded-lg bg-black/90 text-green-400 text-xs font-mono overflow-x-auto leading-relaxed border border-white/10 max-h-[250px]">
+                {code}
+            </pre>
+            <Button
+                variant="outline"
+                size="icon"
+                className="absolute top-2 right-2 h-8 w-8 bg-black/50 border-white/10 hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => {
+                    navigator.clipboard.writeText(code);
+                    toast({ title: "Copied", description: "Code snippet copied." });
+                }}
+            >
+                <Copy className="h-4 w-4 text-white" />
+            </Button>
+        </div>
     );
 }
