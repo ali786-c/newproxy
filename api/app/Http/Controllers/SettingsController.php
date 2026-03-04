@@ -69,7 +69,7 @@ class SettingsController extends Controller
             'smtp_port'              => 'mail.mailers.smtp.port',
             'smtp_user'              => 'mail.mailers.smtp.username',
             'smtp_pass'              => 'mail.mailers.smtp.password',
-            'admin_notification_email' => 'mail.from.address',
+            'support_email'          => 'mail.from.address',
         ];
 
         foreach ($envMap as $dbKey => $configKey) {
@@ -123,7 +123,7 @@ class SettingsController extends Controller
             'smtp_port'              => 'MAIL_PORT',
             'smtp_user'              => 'MAIL_USERNAME',
             'smtp_pass'              => 'MAIL_PASSWORD',
-            'admin_notification_email' => 'MAIL_FROM_ADDRESS',
+            'support_email'          => 'MAIL_FROM_ADDRESS',
         ];
 
         if (!isset($envMap[$key])) return;
