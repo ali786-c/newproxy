@@ -16,7 +16,6 @@ import { z } from "zod";
 
 const SOURCE_PROVIDERS = [
   { id: "stripe", name: "Stripe", icon: CreditCard, desc: "Charge client's saved card via Stripe" },
-  { id: "paypal", name: "PayPal", icon: Wallet, desc: "Charge client's PayPal agreement" },
   { id: "crypto", name: "Crypto Wallet", icon: Bitcoin, desc: "Deduct from client's crypto deposit" },
 ] as const;
 

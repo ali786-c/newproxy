@@ -42,7 +42,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
 };
 
 
-type PaymentMethod = "stripe" | "paypal" | "cryptomus" | "manual";
+type PaymentMethod = "stripe" | "cryptomus" | "manual";
 
 export default function Billing() {
   const queryClient = useQueryClient();
@@ -279,7 +279,6 @@ export default function Billing() {
 
   const PAYMENT_METHODS = [
     { id: "stripe" as PaymentMethod, name: "Card (Stripe)", subtitle: "Credit/Debit Card", icon: CreditCard, vatLabel: "+22% VAT", enabled: gateways.stripe },
-    { id: "paypal" as PaymentMethod, name: "PayPal", subtitle: "PayPal Balance", icon: Wallet, vatLabel: "+22% VAT", enabled: gateways.paypal },
     { id: "cryptomus" as PaymentMethod, name: "Crypto", subtitle: "Automated via Cryptomus", icon: Bitcoin, vatLabel: "No VAT", enabled: gateways.cryptomus },
     { id: "manual" as PaymentMethod, name: "Binance Pay", subtitle: "Manual Transfer", icon: Bitcoin, vatLabel: "No VAT", enabled: gateways.crypto },
   ];

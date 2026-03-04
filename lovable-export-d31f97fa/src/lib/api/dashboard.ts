@@ -246,7 +246,6 @@ export const clientApi = {
   getGateways: () =>
     api.get("/billing/gateways", z.object({
       stripe: z.boolean(),
-      paypal: z.boolean(),
       crypto: z.boolean(),
       cryptomus: z.boolean()
     })),

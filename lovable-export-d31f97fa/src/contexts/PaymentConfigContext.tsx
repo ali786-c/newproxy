@@ -3,7 +3,6 @@ import { clientApi } from "@/lib/api/dashboard";
 
 export interface PaymentGatewayState {
   stripe: boolean;
-  paypal: boolean;
   crypto: boolean;
   cryptomus: boolean;
 }
@@ -21,7 +20,6 @@ const PaymentConfigContext = createContext<PaymentConfigContextValue | null>(nul
 export function PaymentConfigProvider({ children }: { children: ReactNode }) {
   const [gateways, setGateways] = useState<PaymentGatewayState>({
     stripe: false,
-    paypal: false,
     crypto: false,
     cryptomus: false,
   });
@@ -34,7 +32,6 @@ export function PaymentConfigProvider({ children }: { children: ReactNode }) {
         const config = await clientApi.getGateways();
         setGateways({
           stripe: config.stripe,
-          paypal: config.paypal,
           crypto: config.crypto,
           cryptomus: config.cryptomus
         });
