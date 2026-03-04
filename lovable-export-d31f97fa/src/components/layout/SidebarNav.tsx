@@ -365,7 +365,6 @@ export function SidebarNav() {
         { title: "Currencies", url: "/admin/currencies", icon: DollarSign },
         { title: t("nav.alerts"), url: "/admin/alerts", icon: Bell },
         { title: t("nav.settings"), url: "/admin/settings", icon: Settings },
-        { title: "Profile", url: "/admin/profile", icon: Users },
         { title: "Security", url: "/admin/security", icon: Shield },
       ],
     },

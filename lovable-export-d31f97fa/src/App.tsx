@@ -219,7 +219,6 @@ function App() {
                               <Route path="referrals" element={<AdminReferrals />} />
                               <Route path="fulfillment-logs" element={<AdminFulfillmentLogs />} />
                               <Route path="email-templates" element={<AdminEmailTemplates />} />
-                              <Route path="profile" element={<AppSettings />} />
                               <Route path="security" element={<Security />} />
                             </Route>
 
