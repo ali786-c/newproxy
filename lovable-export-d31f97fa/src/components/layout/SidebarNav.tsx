@@ -182,7 +182,6 @@ const ADMIN_SECTIONS: NavSection[] = [
       { title: "Currencies", url: "/admin/currencies", icon: DollarSign },
       { title: "Alerts", url: "/admin/alerts", icon: Bell },
       { title: "Settings", url: "/admin/settings", icon: Settings },
-      { title: "Profile", url: "/admin/profile", icon: Users },
       { title: "Security", url: "/admin/security", icon: Shield },
     ],
   },
