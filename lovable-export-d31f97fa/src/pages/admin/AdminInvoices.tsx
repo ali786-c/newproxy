@@ -49,8 +49,8 @@ export default function AdminInvoices() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      api.patch(`/admin/invoices/${id}/status`, { status }, z.any()),
+    mutationFn: ({ id, status, source }: { id: number; status: string; source: string }) =>
+      api.patch(`/admin/invoices/${id}/status`, { status, source }, z.any()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
       toast({ title: "Status Updated", description: "The invoice status has been successfully updated." });
@@ -208,52 +208,51 @@ export default function AdminInvoices() {
                 </div>
               </div>
 
-              {selected.source === 'invoice' && (
-                <div className="space-y-3 border-t pt-4">
-                  <p className="text-sm font-medium">Manage Invoice Status</p>
-                  <div className="flex items-center gap-2">
-                    <Select
-                      defaultValue={selected.status}
-                      onValueChange={(val) => updateStatusMutation.mutate({ id: selected.db_id, status: val })}
-                      disabled={updateStatusMutation.isPending}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="paid">
-                          <div className="flex items-center gap-2 text-green-600">
-                            <CheckCircle2 className="h-4 w-4" /> Paid
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="unpaid">
-                          <div className="flex items-center gap-2 text-orange-600">
-                            <Clock className="h-4 w-4" /> Unpaid
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="pending">
-                          <div className="flex items-center gap-2 text-blue-600">
-                            <AlertCircle className="h-4 w-4" /> Pending
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="cancelled">
-                          <div className="flex items-center gap-2 text-red-600">
-                            <XCircle className="h-4 w-4" /> Cancelled
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="failed">
-                          <div className="flex items-center gap-2 text-red-800">
-                            <XCircle className="h-4 w-4" /> Failed
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    Changing the status here is primarily for management. It will update the customer's portal view.
-                  </p>
+              <div className="space-y-3 border-t pt-4">
+                <p className="text-sm font-medium">Manage Status</p>
+                <div className="flex items-center gap-2">
+                  <Select
+                    defaultValue={selected.status}
+                    onValueChange={(val) => updateStatusMutation.mutate({ id: selected.db_id, status: val, source: selected.source })}
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="paid">
+                        <div className="flex items-center gap-2 text-green-600">
+                          <CheckCircle2 className="h-4 w-4" /> Paid
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="unpaid">
+                        <div className="flex items-center gap-2 text-orange-600">
+                          <Clock className="h-4 w-4" /> Unpaid
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="pending">
+                        <div className="flex items-center gap-2 text-blue-600">
+                          <AlertCircle className="h-4 w-4" /> Pending
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="cancelled">
+                        <div className="flex items-center gap-2 text-red-600">
+                          <XCircle className="h-4 w-4" /> Cancelled
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="failed">
+                        <div className="flex items-center gap-2 text-red-800">
+                          <XCircle className="h-4 w-4" /> Failed
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                <p className="text-[10px] text-muted-foreground">
+                  Changing the status here will update the record and customer's portal view.
+                  {selected.source === 'transaction' && " For transactions, marking as 'cancelled' or 'failed' will reverse the balance impact."}
+                </p>
+              </div>
 
               <div className="flex items-center justify-between border-t pt-4">
                 <span className="text-sm font-medium">Total Amount</span>

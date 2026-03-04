@@ -1168,7 +1168,7 @@ class BillingController extends Controller
                     'user'           => $t->user,
                     'amount'         => (float) $t->amount,
                     'currency'       => 'EUR', // Wallet is primarily EUR
-                    'status'         => 'paid', // Wallet transactions are by definition successful credits/debits
+                    'status'         => $t->status ?: 'paid',
                     'description'    => $t->description,
                     'reference'      => $t->reference,
                     'created_at'     => $t->created_at->toIso8601String(),
@@ -1180,26 +1180,65 @@ class BillingController extends Controller
     }
 
     /**
-     * Admin: Update invoice status manually.
+     * Admin: Update financial record status manually.
      */
     public function updateInvoiceStatus(Request $request, $id)
     {
         $request->validate([
             'status' => 'required|in:paid,unpaid,pending,cancelled,failed,voided',
+            'source' => 'required|in:invoice,transaction',
         ]);
 
-        $invoice = \App\Models\Invoice::findOrFail($id);
-        $oldStatus = $invoice->status;
-        $invoice->status = $request->status;
-        $invoice->save();
+        if ($request->source === 'invoice') {
+            $record = \App\Models\Invoice::findOrFail($id);
+        } else {
+            $record = WalletTransaction::findOrFail($id);
+        }
 
-        \App\Models\AdminLog::log(
-            'update_invoice_status',
-            "Invoice #{$invoice->id} status changed from {$oldStatus} to {$request->status}",
-            $invoice->user_id
-        );
+        $oldStatus = $record->status ?: ($request->source === 'transaction' ? 'paid' : 'unpaid');
+        $newStatus = $request->status;
+        
+        if ($oldStatus === $newStatus) {
+            return response()->json(['message' => 'Status is already ' . $newStatus]);
+        }
 
-        return response()->json(['message' => 'Invoice status updated successfully', 'invoice' => $invoice]);
+        DB::transaction(function () use ($record, $request, $oldStatus, $newStatus) {
+            $record->status = $newStatus;
+            $record->save();
+
+            // Balance Reversal Logic for Transactions
+            // If a 'paid' transaction is cancelled/failed, we reverse the balance impact
+            if ($request->source === 'transaction' && $record instanceof WalletTransaction) {
+                $user = User::lockForUpdate()->find($record->user_id);
+                if ($user) {
+                    if ($oldStatus === 'paid' && in_array($newStatus, ['cancelled', 'failed'])) {
+                        // Reverse the original impact
+                        if ($record->type === 'credit') {
+                            $user->balance -= $record->amount;
+                        } else {
+                            $user->balance += $record->amount;
+                        }
+                        $user->save();
+                    } elseif (in_array($oldStatus, ['cancelled', 'failed']) && $newStatus === 'paid') {
+                        // Re-apply the impact
+                        if ($record->type === 'credit') {
+                            $user->balance += $record->amount;
+                        } else {
+                            $user->balance -= $record->amount;
+                        }
+                        $user->save();
+                    }
+                }
+            }
+
+            \App\Models\AdminLog::log(
+                'update_financial_status',
+                "{$request->source} #{$record->id} status changed from {$oldStatus} to {$newStatus}",
+                $record->user_id
+            );
+        });
+
+        return response()->json(['message' => 'Status updated successfully', 'record' => $record]);
     }
 
     /**
