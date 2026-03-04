@@ -3,8 +3,8 @@ import { SEOHead } from "@/components/seo/SEOHead";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -22,7 +22,13 @@ import {
     Lock,
     RefreshCw,
     Mail,
-    Calendar
+    Calendar,
+    Copy,
+    Terminal,
+    Globe,
+    Search,
+    Check,
+    Eye
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -139,6 +145,18 @@ export default function UserDetail() {
             toast({ title: "Error", description: err.message, variant: "destructive" });
         }
     };
+
+    const handleDeleteProxy = async (proxyId: number) => {
+        if (!confirm("Are you sure you want to delete this specific proxy record?")) return;
+        try {
+            await deleteProxy.mutateAsync({ proxyId, userId: user.id });
+            toast({ title: "Proxy deleted successfully" });
+        } catch (err: any) {
+            toast({ title: "Error", description: err.message, variant: "destructive" });
+        }
+    };
+
+    const [selectedProxy, setSelectedProxy] = useState<any>(null);
 
     const handleBan = async () => {
         try {
@@ -332,10 +350,10 @@ export default function UserDetail() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Order Info</TableHead>
+                                            <TableHead>Proxy Credentials</TableHead>
+                                            <TableHead>Order</TableHead>
                                             <TableHead>Type</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Qty</TableHead>
+                                            <TableHead>Location</TableHead>
                                             <TableHead>Expires</TableHead>
                                             <TableHead className="text-right">Action</TableHead>
                                         </TableRow>
@@ -346,32 +364,81 @@ export default function UserDetail() {
                                         ) : orders?.length === 0 ? (
                                             <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No active products found for this user.</TableCell></TableRow>
                                         ) : (
-                                            orders?.map((order: any) => (
-                                                <TableRow key={order.id}>
-                                                    <TableCell>
-                                                        <div>
-                                                            <p className="font-medium text-sm">#{order.id} {order.product?.name}</p>
-                                                            <p className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</p>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="capitalize text-xs font-semibold">{order.product?.type || "Manual"}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={order.status === "active" ? "default" : "secondary"} className="text-[10px] uppercase">
-                                                            {order.status}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-sm font-medium">{order.proxies?.length || 0} units</TableCell>
-                                                    <TableCell className="text-xs text-muted-foreground">
-                                                        {order.expires_at ? new Date(order.expires_at).toLocaleDateString() : "Never"}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteOrder(order.id)}>
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
+                                            orders?.flatMap((order: any) =>
+                                                order.proxies?.map((proxy: any) => (
+                                                    <TableRow key={proxy.id}>
+                                                        <TableCell>
+                                                            <div className="flex flex-col">
+                                                                <code className="text-[10px] font-mono font-medium text-foreground bg-muted/50 px-1.5 py-0.5 rounded border border-border/50 w-fit">
+                                                                    {proxy.host}:{proxy.port}
+                                                                </code>
+                                                                <div className="flex items-center gap-2 mt-1">
+                                                                    <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">User: {proxy.username}</span>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col">
+                                                                <p className="text-xs font-semibold">#{order.id}</p>
+                                                                <p className="text-[10px] text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</p>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="capitalize text-[10px] font-bold">
+                                                            <Badge variant="outline" className="text-[9px] h-4 px-1 bg-primary/5 border-primary/20 text-primary">
+                                                                {order.product?.type || "Proxy"}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-1.5 text-xs">
+                                                                <span>{proxy.country === 'US' ? '🇺🇸' : proxy.country === 'GB' ? '🇬🇧' : '🌐'}</span>
+                                                                <span className="font-medium">{proxy.country}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-[10px] text-muted-foreground">
+                                                            {order.expires_at ? new Date(order.expires_at).toLocaleDateString() : "Never"}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <div className="flex justify-end gap-1">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                                                                    onClick={() => setSelectedProxy({ ...proxy, product_name: order.product?.name, type: order.product?.type })}
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                    onClick={() => handleDeleteProxy(proxy.id)}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )) || []
+                                            )
                                         )}
+                                        {/* Fallback for orders without proxies */}
+                                        {!ordersLoading && orders?.map((order: any) => (!order.proxies || order.proxies.length === 0) && (
+                                            <TableRow key={`order-${order.id}`}>
+                                                <TableCell className="text-muted-foreground italic text-xs">No proxies initialized</TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col">
+                                                        <p className="text-xs font-semibold">#{order.id}</p>
+                                                        <p className="text-[10px] text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</p>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell colSpan={3}></TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteOrder(order.id)}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
                                     </TableBody>
                                 </Table>
                             </CardContent>
@@ -467,6 +534,176 @@ export default function UserDetail() {
                     </TabsContent>
                 </Tabs>
             </div>
+
+            <Dialog open={!!selectedProxy} onOpenChange={() => setSelectedProxy(null)}>
+                <DialogContent className="max-w-3xl bg-card border-border/50 shadow-2xl overflow-hidden p-0">
+                    <div className="relative h-2 bg-primary"></div>
+                    <div className="p-6 space-y-6">
+                        <DialogHeader className="pt-2">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                                    <Terminal className="h-6 w-6 text-primary" />
+                                </div>
+                                <div className="text-left">
+                                    <DialogTitle className="text-xl font-bold tracking-tight">Proxy Integration</DialogTitle>
+                                    <DialogDescription className="text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                        <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10px] uppercase font-bold px-1.5 py-0">
+                                            {selectedProxy?.product_name || 'Proxy Batch'}
+                                        </Badge>
+                                        Credentials & Snippets
+                                    </DialogDescription>
+                                </div>
+                            </div>
+                        </DialogHeader>
+
+                        {selectedProxy && (
+                            <div className="space-y-6">
+                                {/* Credentials Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <CredentialCard
+                                        label="Host:Port"
+                                        value={`${selectedProxy.host}:${selectedProxy.port}`}
+                                        icon={<Globe className="h-3.5 w-3.5" />}
+                                    />
+                                    <CredentialCard
+                                        label="Country"
+                                        value={selectedProxy.country}
+                                        subValue={selectedProxy.country === 'US' ? 'United States' : selectedProxy.country === 'GB' ? 'United Kingdom' : 'Global'}
+                                        icon={<span>{selectedProxy.country === 'US' ? '🇺🇸' : selectedProxy.country === 'GB' ? '🇬🇧' : '🌐'}</span>}
+                                    />
+                                    <CredentialCard
+                                        label="Username"
+                                        value={selectedProxy.username}
+                                        icon={<Search className="h-3.5 w-3.5" />}
+                                    />
+                                    <CredentialCard
+                                        label="Password"
+                                        value={selectedProxy.password}
+                                        icon={<Check className="h-3.5 w-3.5" />}
+                                    />
+                                </div>
+
+                                {/* Integration Tabs */}
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Integration Snippets</h4>
+                                    <Tabs defaultValue="curl" className="w-full">
+                                        <TabsList className="w-full bg-muted/50 p-1 rounded-xl h-11">
+                                            <TabsTrigger value="curl" className="flex-1 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">cURL</TabsTrigger>
+                                            <TabsTrigger value="python" className="flex-1 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">Python</TabsTrigger>
+                                            <TabsTrigger value="node" className="flex-1 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm">Node.js</TabsTrigger>
+                                        </TabsList>
+                                        <div className="mt-4 ring-1 ring-border/50 rounded-2xl overflow-hidden shadow-inner">
+                                            <TabsContent value="curl" className="m-0 border-none">
+                                                <SnippetBlock code={generateCurl(selectedProxy)} />
+                                            </TabsContent>
+                                            <TabsContent value="python" className="m-0 border-none">
+                                                <SnippetBlock code={generatePython(selectedProxy)} />
+                                            </TabsContent>
+                                            <TabsContent value="node" className="m-0 border-none">
+                                                <SnippetBlock code={generateNode(selectedProxy)} />
+                                            </TabsContent>
+                                        </div>
+                                    </Tabs>
+                                </div>
+
+                                <div className="flex justify-end pt-2">
+                                    <Button variant="outline" onClick={() => setSelectedProxy(null)} className="rounded-xl px-8 border-border/50 hover:bg-muted/50">
+                                        Close Details
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
+
+// ── Components ────────────────────────────────
+
+function CredentialCard({ label, value, subValue, icon }: { label: string, value: string, subValue?: string, icon: React.ReactNode }) {
+    return (
+        <div className="group relative p-4 rounded-2xl border border-border/50 bg-muted/20 hover:bg-muted/40 hover:border-primary/30 transition-all duration-300 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-muted-foreground/70 font-bold text-[10px] uppercase tracking-wider">
+                    {icon}
+                    {label}
+                </div>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => {
+                        navigator.clipboard.writeText(value);
+                        toast({ title: "Copied", description: `${label} copied.` });
+                    }}
+                >
+                    <Copy className="h-3.5 w-3.5" />
+                </Button>
+            </div>
+            <div className="flex flex-col">
+                <code className="text-sm font-mono font-medium break-all tracking-tight text-foreground select-all">
+                    {value}
+                </code>
+                {subValue && (
+                    <span className="text-[10px] text-muted-foreground font-medium mt-1">{subValue}</span>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function SnippetBlock({ code }: { code: string }) {
+    return (
+        <div className="relative group">
+            <div className="absolute top-3 right-3 z-10">
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 gap-2 bg-background/50 backdrop-blur-md border border-border/50 hover:bg-background/80 transition-all opacity-0 group-hover:opacity-100"
+                    onClick={() => {
+                        navigator.clipboard.writeText(code);
+                        toast({ title: "Copied", description: "Code snippet copied." });
+                    }}
+                >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                </Button>
+            </div>
+            <pre className="p-6 bg-muted/30 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all selection:bg-primary/30 min-h-[120px] max-h-[400px]">
+                {code}
+            </pre>
+        </div>
+    );
+}
+
+// ── Helpers ───────────────────────────────────
+
+const generateCurl = (p: any) => `curl -x http://${p.username}:${p.password}@${p.host}:${p.port} https://api.ipify.org`;
+
+const generatePython = (p: any) => `import requests
+
+proxies = {
+    'http': 'http://${p.username}:${p.password}@${p.host}:${p.port}',
+    'https': 'http://${p.username}:${p.password}@${p.host}:${p.port}',
+}
+
+response = requests.get('https://api.ipify.org', proxies=proxies)
+print(response.text)`;
+
+const generateNode = (p: any) => `const axios = require('axios');
+
+axios.get('https://api.ipify.org', {
+    proxy: {
+        protocol: 'http',
+        host: '${p.host}',
+        port: ${p.port},
+        auth: {
+            username: '${p.username}',
+            password: '${p.password}'
+        }
+    }
+})
+.then(res => console.log(res.data))
+.catch(err => console.error(err));`;

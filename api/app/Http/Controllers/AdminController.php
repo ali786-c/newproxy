@@ -160,6 +160,28 @@ class AdminController extends Controller
     }
 
     /**
+     * DELETE /admin/proxies/{id} - Delete a specific proxy record
+     */
+    public function deleteProxy($proxyId)
+    {
+        $proxy = \App\Models\Proxy::findOrFail($proxyId);
+        $orderId = $proxy->order_id;
+        $userId = $proxy->order->user_id;
+
+        DB::transaction(function() use ($proxy, $orderId, $userId) {
+            $proxy->delete();
+
+            AdminLog::log(
+                'delete_proxy',
+                "Proxy #{$proxy->id} from Order #{$orderId} deleted by admin.",
+                $userId
+            );
+        });
+
+        return response()->json(['message' => 'Proxy deleted successfully']);
+    }
+
+    /**
      * POST /admin/users/{id}/orders - Manually add an order/proxy to a user
      */
     public function addUserOrder(Request $request, $id)

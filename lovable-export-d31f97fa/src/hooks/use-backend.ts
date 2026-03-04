@@ -719,6 +719,16 @@ export function useAdminUserActions() {
     },
   });
 
+  const deleteProxy = useMutation({
+    mutationFn: async ({ proxyId, userId }: { proxyId: string | number; userId: string | number }) => {
+      return api.delete(`/admin/proxies/${proxyId}`, MessageSchema);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users", variables.userId, "orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-user-stats", String(variables.userId)] });
+    },
+  });
+
   const updateRole = useMutation({
     mutationFn: async ({ id, role }: { id: string | number; role: string }) => {
       return api.post(`/admin/users/${id}/role`, MessageSchema, { role });
@@ -729,7 +739,7 @@ export function useAdminUserActions() {
     },
   });
 
-  return { updatePassword, addOrder, deleteOrder, updateRole };
+  return { updatePassword, addOrder, deleteOrder, deleteProxy, updateRole };
 }
 
 export function useAdminAction() {

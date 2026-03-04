@@ -135,6 +135,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::post('/users/{id}/role', [\App\Http\Controllers\AdminController::class, 'updateRole']);
     Route::post('/users/{id}/password', [\App\Http\Controllers\AdminController::class, 'updatePassword']);
     Route::delete('/orders/{orderId}', [\App\Http\Controllers\AdminController::class, 'deleteOrder']);
+    Route::delete('/proxies/{proxyId}', [\App\Http\Controllers\AdminController::class, 'deleteProxy']);
     Route::get('/stats',          [\App\Http\Controllers\AdminController::class, 'stats']);
     Route::get('/logs',           [\App\Http\Controllers\AdminController::class, 'logs']);
     Route::get('/invoices',       [\App\Http\Controllers\BillingController::class, 'adminInvoices']);
