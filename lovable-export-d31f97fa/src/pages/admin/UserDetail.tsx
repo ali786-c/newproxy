@@ -3,6 +3,7 @@ import { SEOHead } from "@/components/seo/SEOHead";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,6 +45,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
     DialogFooter,
     DialogTrigger
 } from "@/components/ui/dialog";
@@ -61,7 +63,7 @@ export default function UserDetail() {
     const { data: user, isLoading: userLoading } = useAdminUserDetail(id!);
     const { data: orders, isLoading: ordersLoading } = useAdminUserOrders(id!);
     const { data: products } = useProducts();
-    const { updatePassword, addOrder, deleteOrder, updateRole } = useAdminUserActions();
+    const { updatePassword, addOrder, deleteOrder, deleteProxy, updateRole } = useAdminUserActions();
     const adminAction = useAdminAction();
 
     const [balanceAmount, setBalanceAmount] = useState("");
@@ -74,6 +76,7 @@ export default function UserDetail() {
     const [orderQuantity, setOrderQuantity] = useState("1");
     const [orderDays, setOrderDays] = useState("30");
     const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
+    const [selectedProxy, setSelectedProxy] = useState<any>(null);
 
     if (userLoading) return <div className="p-8 text-center text-muted-foreground">Loading user details...</div>;
     if (!user) return <div className="p-8 text-center text-muted-foreground">User not found</div>;
@@ -155,8 +158,6 @@ export default function UserDetail() {
             toast({ title: "Error", description: err.message, variant: "destructive" });
         }
     };
-
-    const [selectedProxy, setSelectedProxy] = useState<any>(null);
 
     const handleBan = async () => {
         try {
