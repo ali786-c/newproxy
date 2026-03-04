@@ -2,19 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import { z } from "zod";
 
-const TransactionSchema = z.object({
-  id: z.number(),
-  user_id: z.number(),
-  amount: z.number().or(z.string()),
-  type: z.string(),
-  description: z.string(),
-  reference: z.string().nullable(),
-  created_at: z.string(),
+const AdminFinancialRecordSchema = z.object({
+  id: z.string(),
+  db_id: z.number(),
+  source: z.enum(["invoice", "transaction"]),
   user: z.object({
     name: z.string().nullable(),
     email: z.string(),
   }).nullable(),
+  amount: z.number(),
+  currency: z.string(),
+  status: z.string(),
+  description: z.string(),
+  reference: z.string().nullable(),
+  created_at: z.string(),
+  type: z.string().optional(), // only for source=transaction
 });
+
 import { SEOHead } from "@/components/seo/SEOHead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,8 +26,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Search, Download, Eye, FileText, User as UserIcon, Calendar, Hash, Receipt } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Download, Eye, FileText, User as UserIcon, Calendar, Hash, Receipt, CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
   credit: "default",
@@ -33,19 +40,38 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
 export default function AdminInvoices() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<any>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const { data: transactions = [], isLoading } = useQuery({
+  const { data: records = [], isLoading } = useQuery({
     queryKey: ["admin-invoices"],
-    queryFn: () => api.get("/admin/invoices", z.array(TransactionSchema)),
+    queryFn: () => api.get("/admin/invoices", z.array(AdminFinancialRecordSchema)),
   });
 
-  const filtered = transactions.filter((t: any) => {
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      api.patch(`/admin/invoices/${id}/status`, { status }, z.any()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
+      toast({ title: "Status Updated", description: "The invoice status has been successfully updated." });
+      setSelected(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Could not update invoice status.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filtered = records.filter((r: any) => {
     const q = search.toLowerCase();
     return (
-      String(t.id).includes(q) ||
-      t.user?.email.toLowerCase().includes(q) ||
-      t.description.toLowerCase().includes(q) ||
-      (t.reference && t.reference.toLowerCase().includes(q))
+      r.id.toLowerCase().includes(q) ||
+      r.user?.email.toLowerCase().includes(q) ||
+      r.description.toLowerCase().includes(q) ||
+      (r.reference && r.reference.toLowerCase().includes(q))
     );
   });
 
@@ -73,38 +99,54 @@ export default function AdminInvoices() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID / Ref</TableHead>
+                  <TableHead>Reference</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="h-24 text-center">Loading transactions...</TableCell></TableRow>
-                ) : filtered.map((t: any) => (
-                  <TableRow key={t.id}>
+                  <TableRow><TableCell colSpan={6} className="h-24 text-center">Loading financial records...</TableCell></TableRow>
+                ) : filtered.map((r: any) => (
+                  <TableRow key={r.id}>
                     <TableCell className="font-mono text-[10px]">
                       <div className="flex flex-col">
-                        <span>#TX-{t.id}</span>
-                        {t.reference && <span className="text-muted-foreground truncate max-w-[100px]">{t.reference}</span>}
+                        <span className="font-bold">{r.id}</span>
+                        {r.reference && <span className="text-muted-foreground truncate max-w-[120px]">{r.reference}</span>}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium">{t.user?.name || "Unknown"}</span>
-                        <span className="text-xs text-muted-foreground">{t.user?.email}</span>
+                        <span className="text-sm font-medium">{r.user?.name || "Unknown"}</span>
+                        <span className="text-xs text-muted-foreground">{r.user?.email}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">{t.description}</TableCell>
-                    <TableCell className={t.type === 'credit' ? 'text-green-600 font-semibold text-sm' : 'text-sm'}>
-                      {t.type === 'credit' ? '+' : '-'}${Number(t.amount).toFixed(2)}
+                    <TableCell className="text-sm">
+                      <div className="flex items-center gap-2">
+                        {r.source === 'invoice' ? <Receipt className="h-3 w-3 text-blue-500" /> : <Hash className="h-3 w-3 text-gray-400" />}
+                        <span className="truncate max-w-[200px]">{r.description}</span>
+                      </div>
                     </TableCell>
-                    <TableCell><Badge variant={STATUS_VARIANT[t.type] ?? "secondary"}>{t.type}</Badge></TableCell>
+                    <TableCell className="text-sm font-semibold">
+                      {r.currency} {Number(r.amount).toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          r.status === 'paid' ? 'default' :
+                            r.status === 'pending' ? 'secondary' :
+                              r.status === 'cancelled' || r.status === 'failed' ? 'destructive' : 'outline'
+                        }
+                        className="capitalize"
+                      >
+                        {r.status}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => setSelected(t)}>
+                      <Button variant="ghost" size="icon" onClick={() => setSelected(r)}>
                         <Eye className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -132,7 +174,7 @@ export default function AdminInvoices() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <p className="text-[11px] uppercase text-muted-foreground font-semibold flex items-center gap-1">
-                    <Hash className="h-3 w-3" /> Transaction ID
+                    <Hash className="h-3 w-3" /> Record ID
                   </p>
                   <p className="text-sm font-mono font-medium">{selected.id}</p>
                 </div>
@@ -166,14 +208,61 @@ export default function AdminInvoices() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between border-t pt-4">
-                <span className="text-sm font-medium">Transaction Amount</span>
-                <div className="text-right">
-                  <p className={`text-lg font-bold ${selected.type === 'credit' ? 'text-green-600' : ''}`}>
-                    {selected.type === 'credit' ? '+' : '-'}${Number(selected.amount).toFixed(2)}
+              {selected.source === 'invoice' && (
+                <div className="space-y-3 border-t pt-4">
+                  <p className="text-sm font-medium">Manage Invoice Status</p>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      defaultValue={selected.status}
+                      onValueChange={(val) => updateStatusMutation.mutate({ id: selected.db_id, status: val })}
+                      disabled={updateStatusMutation.isPending}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="paid">
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle2 className="h-4 w-4" /> Paid
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="unpaid">
+                          <div className="flex items-center gap-2 text-orange-600">
+                            <Clock className="h-4 w-4" /> Unpaid
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="pending">
+                          <div className="flex items-center gap-2 text-blue-600">
+                            <AlertCircle className="h-4 w-4" /> Pending
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="cancelled">
+                          <div className="flex items-center gap-2 text-red-600">
+                            <XCircle className="h-4 w-4" /> Cancelled
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="failed">
+                          <div className="flex items-center gap-2 text-red-800">
+                            <XCircle className="h-4 w-4" /> Failed
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Changing the status here is primarily for management. It will update the customer's portal view.
                   </p>
-                  <Badge className="capitalize text-[10px] h-4" variant={STATUS_VARIANT[selected.type]}>
-                    {selected.type}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between border-t pt-4">
+                <span className="text-sm font-medium">Total Amount</span>
+                <div className="text-right">
+                  <p className="text-lg font-bold">
+                    {selected.currency} {Number(selected.amount).toFixed(2)}
+                  </p>
+                  <Badge className="capitalize text-[10px] h-4" variant={selected.status === 'paid' ? 'default' : 'secondary'}>
+                    {selected.status}
                   </Badge>
                 </div>
               </div>
@@ -182,7 +271,7 @@ export default function AdminInvoices() {
                 <Button className="w-full gap-2" variant="outline" onClick={() => window.print()}>
                   <Download className="h-4 w-4" /> Download PDF
                 </Button>
-                <Button className="w-full" onClick={() => setSelected(null)}>Close</Button>
+                <Button className="w-full" variant="outline" onClick={() => setSelected(null)}>Close</Button>
               </div>
             </div>
           )}

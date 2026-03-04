@@ -139,6 +139,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::get('/stats',          [\App\Http\Controllers\AdminController::class, 'stats']);
     Route::get('/logs',           [\App\Http\Controllers\AdminController::class, 'logs']);
     Route::get('/invoices',       [\App\Http\Controllers\BillingController::class, 'adminInvoices']);
+    Route::patch('/invoices/{id}/status', [\App\Http\Controllers\BillingController::class, 'updateInvoiceStatus']);
     Route::get('/payment-gateways', [\App\Http\Controllers\BillingController::class, 'gatewayStatus']);
     Route::get('/fulfillment-logs', [\App\Http\Controllers\AdminController::class, 'fulfillmentLogs']);
     

@@ -1131,13 +1131,75 @@ class BillingController extends Controller
     /**
      * Admin: List all invoices/transactions for all users.
      */
+    /**
+     * Admin: List all invoices/transactions for all users.
+     */
     public function adminInvoices()
     {
-        $transactions = WalletTransaction::with('user:id,name,email')
-            ->latest()
-            ->get();
+        // 1. Formal Invoices (Invoices table)
+        $formalInvoices = \App\Models\Invoice::with('user:id,name,email')->latest()->get()->map(function($inv) {
+            return [
+                'id'             => 'INV-' . $inv->id,
+                'db_id'          => $inv->id,
+                'source'         => 'invoice',
+                'user'           => $inv->user,
+                'amount'         => (float) $inv->amount,
+                'currency'       => $inv->currency,
+                'status'         => $inv->status,
+                'description'    => $inv->description ?: 'Purchase/Subscription',
+                'reference'      => $inv->stripe_invoice_id,
+                'created_at'     => $inv->created_at->toIso8601String(),
+            ];
+        });
 
-        return response()->json($transactions);
+        // 2. Wallet Transactions (WalletTransactions table)
+        // We filter out those that are already linked to formal invoices to avoid duplicates
+        $stripeInvoiceIds = \App\Models\Invoice::pluck('stripe_invoice_id')->filter()->toArray();
+        
+        $walletTx = WalletTransaction::with('user:id,name,email')
+            ->whereNotIn('reference', $stripeInvoiceIds)
+            ->latest()
+            ->get()
+            ->map(function ($t) {
+                return [
+                    'id'             => 'TX-' . $t->id,
+                    'db_id'          => $t->id,
+                    'source'         => 'transaction',
+                    'user'           => $t->user,
+                    'amount'         => (float) $t->amount,
+                    'currency'       => 'EUR', // Wallet is primarily EUR
+                    'status'         => 'paid', // Wallet transactions are by definition successful credits/debits
+                    'description'    => $t->description,
+                    'reference'      => $t->reference,
+                    'created_at'     => $t->created_at->toIso8601String(),
+                    'type'           => $t->type, // credit/debit
+                ];
+            });
+
+        return response()->json(collect($formalInvoices)->merge(collect($walletTx))->sortByDesc('created_at')->values());
+    }
+
+    /**
+     * Admin: Update invoice status manually.
+     */
+    public function updateInvoiceStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:paid,unpaid,pending,cancelled,failed,voided',
+        ]);
+
+        $invoice = \App\Models\Invoice::findOrFail($id);
+        $oldStatus = $invoice->status;
+        $invoice->status = $request->status;
+        $invoice->save();
+
+        \App\Models\AdminLog::log(
+            'update_invoice_status',
+            "Invoice #{$invoice->id} status changed from {$oldStatus} to {$request->status}",
+            $invoice->user_id
+        );
+
+        return response()->json(['message' => 'Invoice status updated successfully', 'invoice' => $invoice]);
     }
 
     /**
