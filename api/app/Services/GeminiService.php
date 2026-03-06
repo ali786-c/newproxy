@@ -47,7 +47,7 @@ class GeminiService
             ],
             'generationConfig' => [
                 'temperature' => 0.8,
-                'maxOutputTokens' => 4096,
+                'maxOutputTokens' => 8192, // Increased to handle reasoning/thoughts
                 'responseMimeType' => 'application/json',
             ]
         ]);
@@ -68,39 +68,47 @@ class GeminiService
     }
 
     /**
-     * Generate a featured image via Gemini Nano Banana (Gemini 3.1 Flash Image).
+     * Generate a professional featured image via Gemini 3 Pro Image.
      */
     public function generateFeaturedImage(string $imagePrompt)
     {
         $this->getFreshConfig();
         
-        $imageModel = "gemini-3.1-flash-image-preview"; // Nano Banana 2
+        // Upgrade to Pro model for professional asset production
+        $imageModel = "gemini-3-pro-image-preview"; 
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$imageModel}:generateContent?key={$this->apiKey}";
 
-        $response = Http::withoutVerifying()->timeout(120)->post($url, [
+        $response = Http::withoutVerifying()->timeout(150)->post($url, [
             'contents' => [
                 ['parts' => [['text' => $imagePrompt]]]
-            ]
+            ],
+            'generationConfig' => [
+                'temperature' => 0.7,
+                'imageConfig' => [
+                    'aspectRatio' => '16:9',
+                    'imageSize' => '2K', // Higher fidelity for premium look
+                ],
+            ],
         ]);
 
         if ($response->failed()) {
-            Log::warning('Gemini Nano Banana API Failed', ['body' => $response->body()]);
-            return null; // Fallback handled in orchestrator
+            Log::warning('Gemini Pro Image API Failed', ['body' => $response->body()]);
+            return null;
         }
 
         $result = $response->json();
 
         try {
-            // Nano Banana returns image in parts[0]['inlineData']['data']
-            $base64Image = $result['candidates'][0]['content']['parts'][0]['inlineData']['data'] ?? null;
-            if (!$base64Image) {
-                Log::warning('No image data in Gemini response', ['response' => $result]);
+            // Safer extraction: loop through parts to find inlineData
+            $imageInfo = $this->extractInlineImage($result);
+            if (!$imageInfo) {
+                Log::warning('No image data in Gemini Pro response', ['response' => $result]);
                 return null;
             }
 
-            return $this->saveImageLocally($base64Image);
+            return $this->saveImageLocally($imageInfo['data'], $imageInfo['mimeType']);
         } catch (\Exception $e) {
-            Log::error('Failed to save Gemini Image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            Log::error('Failed to save Gemini Pro Image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return null;
         }
     }
@@ -132,13 +140,21 @@ RULES:
    - Takeaways: 3-4 bullet points.
    - FAQ: 2-3 common questions and answers.
    - CTA: Concise call to action.
+
 6. Image Generation Prompt (CRITICAL):
-   - You must generate a highly detailed, professional prompt for an AI image generator.
-   - Quality: Include terms like "hyper-realistic", "8k resolution", "highly detailed textures", "cinematic lighting".
-   - Diversity: For every blog, choose a UNIQUE visual style (e.g., Minimalist 3D, Cyberpunk, Corporate Memphis - but refined, Macro Photography, Neomorphism, or High-End Tech Noir).
-   - Composition: Specify camera angle (e.g., "wide shot", "top-down", "close-up macro") and depth of field ("bokeh background").
-   - NO TEXT: The image must NOT contain any text, letters, or words.
-   - No People: Focus on abstract tech, servers, digital networks, or hardware.
+   - Generate a premium SaaS blog hero image prompt in English.
+   - Visual Style Buckets (Choose ONE unique direction for this post):
+     1) Editorial 3D product render (black/graphite materials).
+     2) Clean enterprise infrastructure photography style (server hardware macro).
+     3) Isometric systems diagram aesthetic (sleek, non-neon).
+     4) Minimal abstract glass-and-metal data visualization.
+     5) Luxury dark-mode tech composition.
+   - Anti-Repetition Rules:
+     - DO NOT use glowing spheres, holographic globes, or floating cubes.
+     - AVOID generic cyberpunk blue/purple neon circuits.
+     - NO random world maps or cityscapes.
+   - Composition: Wide cinematic banner style (16:9).
+   - Constraints: NO text, NO logos, NO watermarks, NO people.
 
 OUTPUT FORMAT (Strict JSON):
 {
@@ -154,9 +170,28 @@ OUTPUT FORMAT (Strict JSON):
     { "q": "Question?", "a": "Answer text." }
   ],
   "cta": "Call to action text",
-  "image_prompt": "A [Visual Style] of [Specific Subject] relating to {$keyword}. Composition: [Angle]. Lighting: [Lighting Type]. Extra detail: [Specific visual element]. Quality: hyper-realistic, 8k, photorealistic textures. No text."
+  "image_prompt": "A [Chosen Visual Bucket Style] of [Specific Concept relating to {$keyword}]. Composition: Wide-angle cinematic. Lighting: Professional studio lighting. Texture: Realistic brushed metal/glass. Quality: 8k, hyper-realistic, no text."
 }
 PROMPT;
+    }
+
+    /**
+     * Robust extraction loop for inline image data.
+     */
+    protected function extractInlineImage(array $result): ?array
+    {
+        $parts = $result['candidates'][0]['content']['parts'] ?? [];
+
+        foreach ($parts as $part) {
+            if (!empty($part['inlineData']['data'])) {
+                return [
+                    'data' => $part['inlineData']['data'],
+                    'mimeType' => $part['inlineData']['mimeType'] ?? 'image/png'
+                ];
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -178,12 +213,19 @@ PROMPT;
     }
 
     /**
-     * Save base64 image to local public storage.
+     * Save base64 image with proper extension detection.
      */
-    protected function saveImageLocally(string $base64Data): string
+    protected function saveImageLocally(string $base64Data, string $mimeType = 'image/png'): string
     {
         $imageData = base64_decode($base64Data);
-        $fileName = 'blog_' . Str::random(10) . '_' . time() . '.jpg';
+        
+        $extension = match ($mimeType) {
+            'image/jpeg' => 'jpg',
+            'image/webp' => 'webp',
+            default => 'png',
+        };
+
+        $fileName = 'blog_' . Str::random(10) . '_' . time() . '.' . $extension;
         $path = 'blog/' . $fileName;
 
         Storage::disk('public')->put($path, $imageData);
