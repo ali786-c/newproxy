@@ -37,6 +37,12 @@ foreach ($posts as $post) {
         $updated = true;
     }
     
+    // 3. Fix double asterisks in content (Convert **text** to <strong>text</strong>)
+    if (str_contains($post->content, '**')) {
+        $post->content = preg_replace('/\*\*(.*?)\*\*/', '<strong>$1</strong>', $post->content);
+        $updated = true;
+    }
+    
     if ($updated) {
         $fixedCount++;
         echo "Fixed: {$post->title}\n";
