@@ -197,26 +197,29 @@ PROMPT;
 
         return <<<PROMPT
 You are a professional art director for a technology SaaS blog.
-Task: Create a literal, concrete visual brief for a featured image based on the blog content.
+Task: Create a visual brief for a featured image based strictly on the specific content of this blog.
 
 BLOG TITLE: {$title}
 BLOG INTRO: {$intro}
 
 RULES (CRITICAL):
-1. The image must visually match the article topic LITERALLY and DIRECTLY.
-2. Avoid abstract metaphors, floating geometric shapes, glowing spheres, or futuristic sculptures.
-3. Subject: Realistic enterprise technology scenes, server infrastructure, network equipment, high-end office environments, dashboards, or data centers.
-4. Mood: Professional, clean, modern, high-end corporate tech.
-5. Negative: No text, no logos, no watermarks, no people.
+1. Extract the specific industry or use-case discussed in the blog (e.g., SEO, Travel, E-commerce, Market Research, Social Media, etc.).
+2. CREATE A SCENE THAT HIGHLY RELATES TO THIS SPECIFIC USE-CASE. Do NOT just generate generic server racks or datacenters unless the blog is ONLY about infrastructure.
+3. Examples:
+   - If the blog is about SEO: A marketer looking at search ranking dashboards, or a laptop showing analytics charts.
+   - If about Travel: A person booking flights on a tablet, or an airport departure board.
+   - If about Brand Protection: A corporate lawyer examining digital documents, or a secure glowing shield over a brand logo.
+4. Visual Style: Photorealistic, cinematic, premium corporate or editorial lifestyle photography. Bright, clean, professional.
+5. NO ABSTRACT NEON ART. No glowing sci-fi orbs, no hooded hackers, no generic futuristic matrix codes. Must look like a high-end stock photo.
 
 OUTPUT FORMAT (Strict JSON):
 {
-  "subject": "Clear description of the main literal subject matter",
-  "environment": "Description of the setting/background (e.g., modern datacenter, corporate office)",
+  "subject": "Clear, literal description of the main subject matter (people, objects, screens) relevant to the blog topic",
+  "environment": "Description of the setting (e.g., modern office, coffee shop, studio)",
   "supporting_elements": ["Element 1", "Element 2"],
-  "style": "realistic editorial technology photography",
-  "composition": "wide 16:9 hero banner with cinematic framing",
-  "lighting": "professional studio lighting with sharp detail"
+  "style": "premium photorealistic editorial photography",
+  "composition": "wide 16:9 hero banner",
+  "lighting": "bright, natural or professional studio lighting"
 }
 PROMPT;
     }
@@ -229,12 +232,12 @@ PROMPT;
         $elements = implode(', ', $brief['supporting_elements'] ?? []);
         return sprintf(
             '%s in a %s. Supporting elements: %s. Style: %s. Composition: %s. Lighting: %s. Quality: 8k, hyper-realistic, photorealistic textures. NO TEXT, NO LOGOS, NO WATERMARKS.',
-            $brief['subject'] ?? 'Professional technology infrastructure',
-            $brief['environment'] ?? 'clean datacenter environment',
+            $brief['subject'] ?? 'Professional technology or business scene',
+            $brief['environment'] ?? 'modern realistic environment',
             $elements ?: 'none',
-            $brief['style'] ?? 'realistic editorial technology photography',
+            $brief['style'] ?? 'premium photorealistic editorial photography',
             $brief['composition'] ?? 'wide 16:9 banner',
-            $brief['lighting'] ?? 'professional studio lighting'
+            $brief['lighting'] ?? 'bright, natural or professional studio lighting'
         );
     }
 
