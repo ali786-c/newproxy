@@ -289,6 +289,9 @@ PROMPT;
 
         Storage::disk('public')->put($path, $imageData);
 
-        return Storage::disk('public')->url($path);
+        $url = Storage::disk('public')->url($path);
+        
+        // Convert to site-root relative URL (e.g., /api/storage/...) for better compatibility
+        return parse_url($url, PHP_URL_PATH);
     }
 }
