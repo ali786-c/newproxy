@@ -39,7 +39,7 @@ class GeminiService
 
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
 
-        $prompt = $this->buildPrompt($keyword, $category, $recentTitles);
+        $prompt = $this->buildBlogPrompt($keyword, $category, $recentTitles);
 
         $response = Http::withoutVerifying()->timeout(90)->post($url, [
             'contents' => [
@@ -47,9 +47,9 @@ class GeminiService
             ],
             'generationConfig' => [
                 'temperature' => 0.8,
-                'maxOutputTokens' => 8192, // Increased to handle reasoning/thoughts
+                'maxOutputTokens' => 8192,
                 'responseMimeType' => 'application/json',
-            ]
+            ],
         ]);
 
         if ($response->failed()) {
@@ -68,13 +68,50 @@ class GeminiService
     }
 
     /**
-     * Generate a professional featured image via Gemini 3 Pro Image.
+     * Generate a professional image brief from blog content to ensure relevance.
      */
-    public function generateFeaturedImage(string $imagePrompt)
+    public function generateImageBrief(array $blogData): ?array
     {
         $this->getFreshConfig();
         
-        // Upgrade to Pro model for professional asset production
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}";
+
+        $prompt = $this->buildImageBriefPrompt($blogData);
+
+        $response = Http::withoutVerifying()->timeout(60)->post($url, [
+            'contents' => [
+                ['parts' => [['text' => $prompt]]]
+            ],
+            'generationConfig' => [
+                'temperature' => 0.4,
+                'responseMimeType' => 'application/json',
+            ],
+        ]);
+
+        if ($response->failed()) {
+            Log::warning('Gemini Image Brief API Failed', ['body' => $response->body()]);
+            return null;
+        }
+
+        $result = $response->json();
+
+        try {
+            $rawJson = $result['candidates'][0]['content']['parts'][0]['text'];
+            return json_decode($rawJson, true);
+        } catch (\Exception $e) {
+            Log::error('Failed to parse Image Brief JSON', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
+     * Compose final prompt and generate a professional featured image via Gemini 3 Pro.
+     */
+    public function generateFeaturedImage(array $brief)
+    {
+        $this->getFreshConfig();
+        
+        $imagePrompt = $this->composeFinalImagePrompt($brief);
         $imageModel = "gemini-3-pro-image-preview"; 
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$imageModel}:generateContent?key={$this->apiKey}";
 
@@ -86,7 +123,7 @@ class GeminiService
                 'temperature' => 0.7,
                 'imageConfig' => [
                     'aspectRatio' => '16:9',
-                    'imageSize' => '2K', // Higher fidelity for premium look
+                    'imageSize' => '2K',
                 ],
             ],
         ]);
@@ -99,7 +136,6 @@ class GeminiService
         $result = $response->json();
 
         try {
-            // Safer extraction: loop through parts to find inlineData
             $imageInfo = $this->extractInlineImage($result);
             if (!$imageInfo) {
                 Log::warning('No image data in Gemini Pro response', ['response' => $result]);
@@ -108,15 +144,15 @@ class GeminiService
 
             return $this->saveImageLocally($imageInfo['data'], $imageInfo['mimeType']);
         } catch (\Exception $e) {
-            Log::error('Failed to save Gemini Pro Image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            Log::error('Failed to save Gemini Pro Image', ['error' => $e->getMessage()]);
             return null;
         }
     }
 
     /**
-     * Build the structured prompt for diverse blog content.
+     * Blog content generation instructions.
      */
-    protected function buildPrompt(string $keyword, string $category, array $recentTitles): string
+    protected function buildBlogPrompt(string $keyword, string $category, array $recentTitles): string
     {
         $categoryStr = $category ? " within the category '{$category}'" : "";
         $recentStr = !empty($recentTitles) ? "DO NOT use or resemble these recent titles: " . implode(', ', $recentTitles) : "";
@@ -127,33 +163,12 @@ Task: Write a high-quality, engaging blog post about "{$keyword}"{$categoryStr}.
 
 RULES:
 1. Tone: Premium, professional, yet conversational. High engagement.
-2. Word Count: Target 600-700 words. Hard limit: Max 800 words.
+2. Word Count: 600-800 words.
 3. Title Diversity: 
-   - DO NOT start with "What is", "What are", or "Introduction to".
    - Patterns: Listicle, Question-based, "Secrets" reveal, Case Study, or Myth-busting.
    - {$recentStr}
 4. SEO: Naturally include "{$keyword}" in the first 100 words and at least one H2.
-5. Structure: 
-   - Hook: A 1-2 sentence compelling opening.
-   - Lead: 1 paragraph intro.
-   - Body: 3-5 sections with clear headings.
-   - Takeaways: 3-4 bullet points.
-   - FAQ: 2-3 common questions and answers.
-   - CTA: Concise call to action.
-
-6. Image Generation Prompt (CRITICAL):
-   - Task: Generate a world-class prompt for Imagen 3 that VISUALLY ILLUSTRATES the core message or metaphor of your blog post.
-   - Core Concept: Do not just generate "generic tech art". Use the blog's title and hook as inspiration.
-   - Example Directions (Choose ONLY ONE based on the blog's unique angle):
-     - METAPHORICAL: (e.g., A golden key unlocking a digital vault for "Access", a lighthouse in a digital sea for "Guidance").
-     - EDITORIAL/PRODUCT: (e.g., A sleek, macro shot of server hardware with elegant lighting for "Infrastructure").
-     - LIFESTYLE: (e.g., A person in a serene modern cafe using a laptop, with subtle digital connectivity lines in the air for "Remote Work/Privacy").
-     - DATA VIZ: (e.g., A clean 3D isometric representation of data pipelines flowing into a central hub).
-   - Rules:
-     - The image must look like a high-end cover for a premium tech magazine (like Wired or Fast Company).
-     - Diversity: AVOID the "glowing holographic sphere" or "neon circuit" clichés.
-     - PROHIBITED: No text, no letters, no UI labels, no watermarks, no messy overlaps.
-     - Quality: Include "hyper-realistic, 8k, professional studio lighting, shallow depth of field, sharp focus, clean composition".
+5. Structure: Hook, Lead, 3-5 Body Sections with headings, Takeaways, FAQs, and CTA.
 
 OUTPUT FORMAT (Strict JSON):
 {
@@ -165,36 +180,82 @@ OUTPUT FORMAT (Strict JSON):
     { "heading": "Heading Name", "content": "Paragraph content" }
   ],
   "takeaways": ["Point 1", "Point 2", "Point 3"],
-  "faqs": [
-    { "q": "Question?", "a": "Answer text." }
-  ],
-  "cta": "Call to action text",
-  "image_prompt": "A [Specific Style: e.g. Cinematic Lifestyle, Minimalist 3D Render, or Macro Photography] of [Specific Scenographic Concept that illustrates the blog's title]. Environment: [Lighting & Mood]. Technical: 8k resolution, hyper-realistic, shallow depth of field, no text."
+  "faqs": [ { "q": "Question?", "a": "Answer text." } ],
+  "cta": "Call to action text"
 }
 PROMPT;
     }
 
     /**
-     * Robust extraction loop for inline image data.
+     * Image brief generation instructions - focusing on literal relevance.
+     */
+    protected function buildImageBriefPrompt(array $blogData): string
+    {
+        $title = $blogData['title'] ?? '';
+        $intro = $blogData['intro'] ?? '';
+
+        return <<<PROMPT
+You are a professional art director for a technology SaaS blog.
+Task: Create a literal, concrete visual brief for a featured image based on the blog content.
+
+BLOG TITLE: {$title}
+BLOG INTRO: {$intro}
+
+RULES (CRITICAL):
+1. The image must visually match the article topic LITERALLY and DIRECTLY.
+2. Avoid abstract metaphors, floating geometric shapes, glowing spheres, or futuristic sculptures.
+3. Subject: Realistic enterprise technology scenes, server infrastructure, network equipment, high-end office environments, dashboards, or data centers.
+4. Mood: Professional, clean, modern, high-end corporate tech.
+5. Negative: No text, no logos, no watermarks, no people.
+
+OUTPUT FORMAT (Strict JSON):
+{
+  "subject": "Clear description of the main literal subject matter",
+  "environment": "Description of the setting/background (e.g., modern datacenter, corporate office)",
+  "supporting_elements": ["Element 1", "Element 2"],
+  "style": "realistic editorial technology photography",
+  "composition": "wide 16:9 hero banner with cinematic framing",
+  "lighting": "professional studio lighting with sharp detail"
+}
+PROMPT;
+    }
+
+    /**
+     * Assemble the final high-fidelity prompt.
+     */
+    protected function composeFinalImagePrompt(array $brief): string
+    {
+        $elements = implode(', ', $brief['supporting_elements'] ?? []);
+        return sprintf(
+            '%s in a %s. Supporting elements: %s. Style: %s. Composition: %s. Lighting: %s. Quality: 8k, hyper-realistic, photorealistic textures. NO TEXT, NO LOGOS, NO WATERMARKS.',
+            $brief['subject'] ?? 'Professional technology infrastructure',
+            $brief['environment'] ?? 'clean datacenter environment',
+            $elements ?: 'none',
+            $brief['style'] ?? 'realistic editorial technology photography',
+            $brief['composition'] ?? 'wide 16:9 banner',
+            $brief['lighting'] ?? 'professional studio lighting'
+        );
+    }
+
+    /**
+     * Extract inline image data from the response.
      */
     protected function extractInlineImage(array $result): ?array
     {
         $parts = $result['candidates'][0]['content']['parts'] ?? [];
-
         foreach ($parts as $part) {
             if (!empty($part['inlineData']['data'])) {
                 return [
                     'data' => $part['inlineData']['data'],
-                    'mimeType' => $part['inlineData']['mimeType'] ?? 'image/png'
+                    'mimeType' => $part['inlineData']['mimeType'] ?? 'image/jpeg'
                 ];
             }
         }
-
         return null;
     }
 
     /**
-     * Extract JSON from potentially noisy AI response and validate fields.
+     * Extract and validate JSON.
      */
     protected function extractAndValidateJson(string $text): array
     {
@@ -204,7 +265,7 @@ PROMPT;
             $data = json_decode($text, true);
         }
 
-        if (!$data || !isset($data['title'], $data['sections'], $data['image_prompt'])) {
+        if (!$data || !isset($data['title'], $data['sections'])) {
             throw new \Exception('Invalid JSON structure from AI.');
         }
 
@@ -212,16 +273,15 @@ PROMPT;
     }
 
     /**
-     * Save base64 image with proper extension detection.
+     * Save base64 image locally.
      */
-    protected function saveImageLocally(string $base64Data, string $mimeType = 'image/png'): string
+    protected function saveImageLocally(string $base64Data, string $mimeType = 'image/jpeg'): string
     {
         $imageData = base64_decode($base64Data);
-        
         $extension = match ($mimeType) {
-            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
             'image/webp' => 'webp',
-            default => 'png',
+            default => 'jpg',
         };
 
         $fileName = 'blog_' . Str::random(10) . '_' . time() . '.' . $extension;

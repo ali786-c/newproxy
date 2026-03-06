@@ -129,14 +129,14 @@ class AutoBlogController extends Controller
             $recentTitles = BlogPost::latest()->take(10)->pluck('title')->toArray();
 
             // 2. Generate Structured Content (with retry)
-            $blogData = null;
+            $postContent = null;
             $maxRetries = 2;
             $attempt = 0;
 
             while ($attempt < $maxRetries) {
                 $attempt++;
                 try {
-                    $blogData = $gemini->generateBlogPost(
+                    $postContent = $gemini->generateBlogPost(
                         $keywordObj->keyword, 
                         $keywordObj->category ?? 'General', 
                         $recentTitles
@@ -144,7 +144,7 @@ class AutoBlogController extends Controller
 
                     // Validate word count (heuristic: total chars / 6)
                     $totalContent = '';
-                    foreach ($blogData['sections'] as $s) $totalContent .= $s['content'];
+                    foreach ($postContent['sections'] as $s) $totalContent .= $s['content'];
                     $wordCount = str_word_count(strip_tags($totalContent));
 
                     if ($wordCount >= 400 && $wordCount <= 900) break; 
@@ -156,25 +156,29 @@ class AutoBlogController extends Controller
                 }
             }
 
-            // 3. Generate Featured Image
-            $imageUrl = null;
-            if (!empty($blogData['image_prompt'])) {
-                $imageUrl = $gemini->generateFeaturedImage($blogData['image_prompt']);
-            }
-
+            // 3. Generate specialized image brief for literal relevance
+            $imageBrief = $gemini->generateImageBrief($postContent);
+            $imageUrl = $imageBrief ? $gemini->generateFeaturedImage($imageBrief) : null;
+            
+            \Illuminate\Support\Facades\Log::info('AI Blog Manual Generation Result', [
+                'title' => $postContent['title'],
+                'has_image' => !empty($imageUrl),
+                'image_url' => $imageUrl
+            ]);
+            
             // 4. Render Premium HTML
-            $contentHtml = $renderer->render($blogData, $imageUrl);
+            $contentHtml = $renderer->render($postContent, $imageUrl);
 
             // 5. Create the Post
             $post = BlogPost::create([
-                'title'     => $blogData['title'],
-                'slug'      => Str::slug($blogData['title']) . '-' . Str::random(5),
+                'title'     => $postContent['title'],
+                'slug'      => Str::slug($postContent['title']) . '-' . Str::random(5),
                 'content'   => $contentHtml,
-                'excerpt'   => $blogData['excerpt'],
+                'excerpt'   => $postContent['excerpt'],
                 'category'  => $keywordObj->category ?? 'General',
                 'image_url' => $imageUrl,
-                'image_prompt' => $blogData['image_prompt'] ?? null,
-                'image_source' => $imageUrl ? 'ai_gemini' : 'none',
+                'image_prompt' => null, // We use $imageBrief structure app-side now
+                'image_source' => $imageUrl ? 'ai_gemini_pro' : 'none',
                 'is_draft'  => false,
                 'published_at' => now(),
                 'author_id' => null,
@@ -184,13 +188,13 @@ class AutoBlogController extends Controller
 
             \App\Models\AdminLog::log(
                 'trigger_autoblog',
-                "Generated AI blog via Nano Banana: '{$post->title}'",
+                "Generated AI blog with 2K Pro image: '{$post->title}'",
                 null,
                 ['post_id' => $post->id, 'keyword' => $keywordObj->keyword]
             );
 
             return response()->json([
-                'message' => 'AI blog post generated with custom design and images!',
+                'message' => 'AI blog post generated with high-fidelity Pro image!',
                 'post' => $post
             ]);
 

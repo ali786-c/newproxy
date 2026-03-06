@@ -51,31 +51,32 @@ class GenerateAIPost extends Command
             $recentTitles = BlogPost::latest()->take(10)->pluck('title')->toArray();
 
             // 1. Generate Structured Content
-            $blogData = $gemini->generateBlogPost(
+            $postContent = $gemini->generateBlogPost(
                 $keywordObj->keyword, 
                 $keywordObj->category ?? 'General', 
                 $recentTitles
             );
 
-            // 2. Generate Image
-            $imageUrl = null;
-            if (!empty($blogData['image_prompt'])) {
-                $imageUrl = $gemini->generateFeaturedImage($blogData['image_prompt']);
-            }
-
-            // 3. Render
-            $contentHtml = $renderer->render($blogData, $imageUrl);
+            // 2. Generate specialized image brief for literal relevance
+            $this->info("Generating image brief...");
+            $imageBrief = $gemini->generateImageBrief($postContent);
+            
+            $this->info("Generating featured image...");
+            $imageUrl = $imageBrief ? $gemini->generateFeaturedImage($imageBrief) : null;
+            
+            // 3. Render HTML
+            $renderedHtml = $renderer->render($postContent, $imageUrl);
 
             // 4. Save
             $post = BlogPost::create([
-                'title'     => $blogData['title'],
-                'slug'      => Str::slug($blogData['title']) . '-' . Str::random(5),
-                'content'   => $contentHtml,
-                'excerpt'   => $blogData['excerpt'],
+                'title'     => $postContent['title'],
+                'slug'      => Str::slug($postContent['title']) . '-' . Str::random(5),
+                'content'   => $renderedHtml,
+                'excerpt'   => $postContent['excerpt'],
                 'category'  => $keywordObj->category ?? 'General',
                 'image_url' => $imageUrl,
-                'image_prompt' => $blogData['image_prompt'] ?? null,
-                'image_source' => $imageUrl ? 'ai_gemini_cron' : 'none',
+                'image_prompt' => null,
+                'image_source' => $imageUrl ? 'ai_gemini_pro_cron' : 'none',
                 'is_draft'  => false,
                 'published_at' => now(),
                 'author_id' => null,
@@ -87,6 +88,7 @@ class GenerateAIPost extends Command
             
         } catch (\Exception $e) {
             Log::error("Cron: AI Generation Failed: " . $e->getMessage());
+            $this->error("AI Generation Failed: " . $e->getMessage());
         }
     }
 }
