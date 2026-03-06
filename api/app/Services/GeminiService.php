@@ -68,41 +68,39 @@ class GeminiService
     }
 
     /**
-     * Generate a featured image via Gemini Imagen.
+     * Generate a featured image via Gemini Nano Banana (Gemini 3.1 Flash Image).
      */
     public function generateFeaturedImage(string $imagePrompt)
     {
         $this->getFreshConfig();
         
-        // Imagen usually requires v1beta and a specific model name.
-        $imageModel = "imagen-3.0-generate-001";
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$imageModel}:predict?key={$this->apiKey}";
+        $imageModel = "gemini-3.1-flash-image-preview"; // Nano Banana 2
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$imageModel}:generateContent?key={$this->apiKey}";
 
-        $response = Http::withoutVerifying()->timeout(60)->post($url, [
-            'instances' => [
-                ['prompt' => $imagePrompt]
-            ],
-            'parameters' => [
-                'sampleCount' => 1,
-                'aspectRatio' => '1:1',
-                'outputMimeType' => 'image/jpeg',
+        $response = Http::withoutVerifying()->timeout(120)->post($url, [
+            'contents' => [
+                ['parts' => [['text' => $imagePrompt]]]
             ]
         ]);
 
         if ($response->failed()) {
-            Log::warning('Gemini Imagen API Failed', ['body' => $response->body()]);
+            Log::warning('Gemini Nano Banana API Failed', ['body' => $response->body()]);
             return null; // Fallback handled in orchestrator
         }
 
         $result = $response->json();
 
         try {
-            $base64Image = $result['predictions'][0]['bytesBase64Encoded'] ?? null;
-            if (!$base64Image) return null;
+            // Nano Banana returns image in parts[0]['inlineData']['data']
+            $base64Image = $result['candidates'][0]['content']['parts'][0]['inlineData']['data'] ?? null;
+            if (!$base64Image) {
+                Log::warning('No image data in Gemini response', ['response' => $result]);
+                return null;
+            }
 
             return $this->saveImageLocally($base64Image);
         } catch (\Exception $e) {
-            Log::error('Failed to save Gemini Image', ['error' => $e->getMessage()]);
+            Log::error('Failed to save Gemini Image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return null;
         }
     }
