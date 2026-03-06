@@ -42,6 +42,13 @@ class AutoBlogController extends Controller
 
         $keyword = AutoBlogKeyword::create($request->only('keyword', 'category'));
 
+        \App\Models\AdminLog::log(
+            'add_blog_keyword',
+            "Added blog keyword: {$keyword->keyword}" . ($keyword->category ? " ({$keyword->category})" : ""),
+            null,
+            ['keyword' => $keyword->keyword, 'category' => $keyword->category]
+        );
+
         return response()->json($keyword, 201);
     }
 
@@ -51,7 +58,15 @@ class AutoBlogController extends Controller
     public function destroyKeyword($id)
     {
         $keyword = AutoBlogKeyword::findOrFail($id);
+        $keywordVal = $keyword->keyword;
         $keyword->delete();
+
+        \App\Models\AdminLog::log(
+            'delete_blog_keyword',
+            "Removed blog keyword: {$keywordVal}",
+            null,
+            ['id' => $id]
+        );
 
         return response()->json(['message' => 'Keyword deleted.']);
     }
@@ -68,16 +83,23 @@ class AutoBlogController extends Controller
         ]);
 
         if ($request->has('gemini_api_key')) {
-            Setting::updateOrCreate(['key' => 'gemini_api_key'], ['value' => $request->gemini_api_key]);
+            \App\Models\Setting::updateOrCreate(['key' => 'gemini_api_key'], ['value' => $request->gemini_api_key]);
         }
 
         if ($request->has('gemini_model')) {
-            Setting::updateOrCreate(['key' => 'gemini_model'], ['value' => $request->gemini_model]);
+            \App\Models\Setting::updateOrCreate(['key' => 'gemini_model'], ['value' => $request->gemini_model]);
         }
 
         if ($request->has('auto_blog_enabled')) {
-            Setting::updateOrCreate(['key' => 'auto_blog_enabled'], ['value' => $request->auto_blog_enabled ? '1' : '0']);
+            \App\Models\Setting::updateOrCreate(['key' => 'auto_blog_enabled'], ['value' => $request->auto_blog_enabled ? '1' : '0']);
         }
+
+        \App\Models\AdminLog::log(
+            'update_autoblog_settings',
+            "Updated Gemini Auto-Blog Settings",
+            null,
+            $request->except('gemini_api_key') // Don't log the API key in plain context
+        );
 
         return response()->json(['message' => 'Settings updated.']);
     }
@@ -133,6 +155,13 @@ class AutoBlogController extends Controller
             ]);
 
             $keywordObj->update(['last_used_at' => now()]);
+
+            \App\Models\AdminLog::log(
+                'trigger_autoblog',
+                "Manually triggered AI blog generation for '{$keywordObj->keyword}'",
+                null,
+                ['post_id' => $post->id, 'keyword' => $keywordObj->keyword]
+            );
 
             return response()->json([
                 'message' => 'AI blog post generated and published successfully!',

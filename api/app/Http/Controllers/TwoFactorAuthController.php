@@ -83,6 +83,13 @@ class TwoFactorAuthController extends Controller
             $user->two_factor_recovery_codes = $recoveryCodes;
             $user->save();
 
+            // Audit Log
+            \App\Models\AdminLog::log(
+                '2fa_enabled',
+                "User #{$user->id} ({$user->email}) enabled Two-Factor Authentication.",
+                $user->id
+            );
+
             return response()->json([
                 'message' => '2FA enabled successfully',
                 'recovery_codes' => $recoveryCodes
@@ -100,7 +107,7 @@ class TwoFactorAuthController extends Controller
     {
         $request->validate([
             'password' => 'required',
-            'code' => 'nullable|string|size:6',
+            'code' => 'required|string', // Strictly required now
         ]);
 
         $user = $request->user();
@@ -109,17 +116,34 @@ class TwoFactorAuthController extends Controller
             return response()->json(['message' => 'Invalid password'], 422);
         }
 
-        // If enabled, optionally require code to disable
-        if ($user->two_factor_secret && $request->code) {
-             if (!Google2FA::verifyKey($user->two_factor_secret, $request->code)) {
-                 return response()->json(['message' => 'Invalid 2FA code'], 422);
-             }
+        // Handle both TOTP code and Recovery Code
+        $isRecoveryCode = str_contains($request->code, '-');
+        $valid = false;
+
+        if ($isRecoveryCode) {
+            $codes = $user->two_factor_recovery_codes ?? [];
+            if (in_array($request->code, $codes)) {
+                $valid = true;
+            }
+        } else {
+            $valid = Google2FA::verifyKey($user->two_factor_secret, $request->code);
+        }
+
+        if (!$valid) {
+            return response()->json(['message' => 'Invalid verification code'], 422);
         }
 
         $user->two_factor_secret = null;
         $user->two_factor_confirmed_at = null;
         $user->two_factor_recovery_codes = null;
         $user->save();
+
+        // Audit Log
+        \App\Models\AdminLog::log(
+            '2fa_disabled',
+            "User #{$user->id} ({$user->email}) disabled Two-Factor Authentication.",
+            $user->id
+        );
 
         return response()->json(['message' => '2FA disabled successfully']);
     }

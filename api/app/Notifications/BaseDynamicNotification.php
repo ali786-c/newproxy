@@ -30,7 +30,14 @@ abstract class BaseDynamicNotification extends Notification
      */
     public function via($notifiable): array
     {
-        return ['mail', 'database'];
+        $channels = ['mail'];
+        
+        // Only include database channel if the notifiable supports it (e.g. real User model)
+        if (is_object($notifiable) && method_exists($notifiable, 'notifications')) {
+            $channels[] = 'database';
+        }
+        
+        return $channels;
     }
 
     /**

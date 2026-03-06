@@ -167,16 +167,42 @@ class EmailTemplateController extends Controller
         try {
             Notification::route('mail', $request->email)->notify(
                 new \App\Notifications\GenericDynamicNotification($template->key, [
-                    'user' => ['name' => 'Admin Test', 'email' => $request->email, 'ip' => '127.0.0.1'],
+                    'user' => [
+                        'name' => 'Admin Test', 
+                        'email' => $request->email, 
+                        'ip' => '127.0.0.1'
+                    ],
+                    'app' => [
+                        'name' => config('app.name'),
+                        'url' => config('app.url')
+                    ],
+                    'payment' => [
+                        'reference' => 'TEST-REF-' . strtoupper(bin2hex(random_bytes(4))),
+                        'amount' => '49.99',
+                        'currency' => 'EUR',
+                        'method' => 'Stripe'
+                    ],
+                    'order' => [
+                        'id' => 'ORD-TEST-' . time(), 
+                        'amount' => '$99.99'
+                    ],
+                    'ticket' => [
+                        'id' => 'TIC-TEST-' . time(), 
+                        'subject' => 'Test Issue Summary'
+                    ],
                     'action_url' => url('/'),
-                    'order' => ['id' => 'ORD-TEST', 'amount' => '$99.99'],
-                    'ticket' => ['id' => 'TIC-TEST', 'subject' => 'Test Issue']
+                    'admin_url' => url('/admin'),
+                    'year' => date('Y')
                 ])
             );
 
             return response()->json(['message' => "Test email sent to {$request->email}"]);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to send test: ' . $e->getMessage()], 500);
+            \Illuminate\Support\Facades\Log::error("Email Template Test Send Failed ({$template->key}): " . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to send test: ' . $e->getMessage(),
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }

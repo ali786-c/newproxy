@@ -58,6 +58,7 @@ Route::middleware(['auth:sanctum', 'banned'])->group(function () {
     // Billing Routes
     Route::post('/billing/checkout', [\App\Http\Controllers\BillingController::class, 'createCheckout']);
     Route::post('/billing/product-checkout', [\App\Http\Controllers\BillingController::class, 'createProductCheckout']);
+    Route::post('/billing/nowpayments-checkout', [\App\Http\Controllers\BillingController::class, 'createNowPaymentsCheckout']);
     Route::post('/billing/submit-crypto', [\App\Http\Controllers\BillingController::class, 'submitCrypto']);
     Route::post('/billing/setup-intent', [\App\Http\Controllers\BillingController::class, 'createSetupIntent']);
     Route::post('/billing/verify-session', [\App\Http\Controllers\BillingController::class, 'verifySession']);
@@ -110,6 +111,7 @@ Route::middleware(['auth:sanctum', 'banned'])->group(function () {
 // ─────────────────────────────────────────────
 Route::post('/webhook/stripe', [\App\Http\Controllers\BillingController::class, 'handleWebhook']);
 Route::post('/webhook/cryptomus', [\App\Http\Controllers\BillingController::class, 'handleCryptomusWebhook']);
+Route::post('/webhook/nowpayments', [\App\Http\Controllers\BillingController::class, 'handleNowPaymentsWebhook']);
 Route::get('/currencies', [\App\Http\Controllers\CurrencyController::class, 'index']);
 Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
 Route::post('/auth/password/email', [\App\Http\Controllers\PasswordResetController::class, 'sendResetLink']);
@@ -125,8 +127,11 @@ Route::get('/blog/{slug}', [\App\Http\Controllers\BlogController::class, 'show']
 // ─────────────────────────────────────────────
 // Admin Routes
 // ─────────────────────────────────────────────
-Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
+// FIX #10: Add rate limiting to all admin routes.
+// 60 requests/min is generous for real-human admin usage but blocks automated abuse.
+Route::middleware(['auth:sanctum', 'role:admin', 'throttle:60,1'])->prefix('admin')->group(function () {
     Route::get('/users',          [\App\Http\Controllers\AdminController::class, 'users']);
+    Route::get('/users/{id}',     [\App\Http\Controllers\AdminController::class, 'show']);
     Route::get('/users/{id}/stats', [\App\Http\Controllers\AdminController::class, 'userStats']);
     Route::get('/users/{id}/orders', [\App\Http\Controllers\AdminController::class, 'getUserOrders']);
     Route::post('/users/{id}/orders', [\App\Http\Controllers\AdminController::class, 'addUserOrder']);
@@ -139,7 +144,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     Route::get('/stats',          [\App\Http\Controllers\AdminController::class, 'stats']);
     Route::get('/logs',           [\App\Http\Controllers\AdminController::class, 'logs']);
     Route::get('/invoices',       [\App\Http\Controllers\BillingController::class, 'adminInvoices']);
-    Route::patch('/invoices/{id}/status', [\App\Http\Controllers\BillingController::class, 'updateInvoiceStatus']);
+    Route::patch('/invoices/{id}/status', [\App\Http\Controllers\BillingController::class, 'updateInvoiceStatus'])->middleware('throttle:6,1');
     Route::get('/payment-gateways', [\App\Http\Controllers\BillingController::class, 'gatewayStatus']);
     Route::get('/fulfillment-logs', [\App\Http\Controllers\AdminController::class, 'fulfillmentLogs']);
     
@@ -220,6 +225,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(functi
     // Admin Referral Routes
     Route::get('/referrals/stats', [\App\Http\Controllers\AdminController::class, 'referralStats']);
     Route::get('/referrals/earnings', [\App\Http\Controllers\AdminController::class, 'listReferralEarnings']);
+    Route::post('/referrals/earnings/{id}/status', [\App\Http\Controllers\AdminController::class, 'updateReferralEarningStatus']);
     Route::post('/referrals/influencer-rate', [\App\Http\Controllers\AdminController::class, 'updateInfluencerRate']);
 
     // Admin Email Templates Management

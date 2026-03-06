@@ -20,12 +20,24 @@ class AdminLog extends Model
     /**
      * Centralized logging helper.
      */
-    public static function log($action, $details = null, $targetUserId = null)
+    public static function log($action, $details = null, $targetUserId = null, $context = null)
     {
+        if ($context && is_array($context)) {
+            $details = ($details ? $details . " " : "") . "[Context: " . json_encode($context) . "]";
+        }
         $adminId = auth()->id();
         $request = request();
         
-        $ip = $request->ip();
+        // Prioritize Cloudflare / Proxy headers to get the EXACT real user IP
+        $ip = $request->header('CF-Connecting-IP') ?? 
+              $request->header('X-Real-IP') ?? 
+              $request->header('X-Forwarded-For') ?? 
+              $request->ip();
+
+        // If X-Forwarded-For contains multiple IPs, take the first one
+        if (str_contains($ip, ',')) {
+            $ip = trim(explode(',', $ip)[0]);
+        }
         $userAgent = $request->userAgent();
         
         $log = new self([

@@ -40,6 +40,13 @@ class SLAController extends Controller
             $validated
         );
 
+        \App\Models\AdminLog::log(
+            'update_sla_config',
+            "Updated SLA configuration for {$config->proxy_type}",
+            null,
+            $validated
+        );
+
         return response()->json($config);
     }
 
@@ -52,7 +59,14 @@ class SLAController extends Controller
     {
         $credit = SLACredit::findOrFail($id);
         $credit->update(['status' => 'approved']);
-        
+
+        \App\Models\AdminLog::log(
+            'approve_sla_credit',
+            "Approved SLA credit #[{$id}] for user #{$credit->user_id}",
+            $credit->user_id,
+            ['id' => $id, 'amount' => $credit->amount]
+        );
+
         return response()->json($credit);
     }
 }

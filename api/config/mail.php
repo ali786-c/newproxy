@@ -40,6 +40,7 @@ return [
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),
+            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
             'port' => env('MAIL_PORT', 2525),
@@ -86,6 +87,10 @@ return [
                 'log',
             ],
             'retry_after' => 60,
+        ],
+
+        'brevo' => [
+            'transport' => 'brevo',
         ],
 
         'roundrobin' => [

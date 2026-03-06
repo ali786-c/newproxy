@@ -33,6 +33,13 @@ class CouponController extends Controller
 
         $coupon = Coupon::create($validated);
 
+        \App\Models\AdminLog::log(
+            'create_coupon',
+            "Created coupon: {$coupon->code}",
+            null,
+            $validated
+        );
+
         return response()->json($coupon, 201);
     }
 
@@ -42,7 +49,15 @@ class CouponController extends Controller
     public function destroy($id)
     {
         $coupon = Coupon::findOrFail($id);
+        $couponCode = $coupon->code;
         $coupon->delete();
+
+        \App\Models\AdminLog::log(
+            'delete_coupon',
+            "Deleted coupon: {$couponCode}",
+            null,
+            ['id' => $id]
+        );
 
         return response()->json(['message' => 'Coupon deleted successfully']);
     }
@@ -55,6 +70,13 @@ class CouponController extends Controller
         $coupon = Coupon::findOrFail($id);
         $coupon->is_active = !$coupon->is_active;
         $coupon->save();
+
+        \App\Models\AdminLog::log(
+            'toggle_coupon',
+            "Toggled active status for coupon: {$coupon->code} (Now: " . ($coupon->is_active ? 'Active' : 'Inactive') . ")",
+            null,
+            ['id' => $id, 'is_active' => $coupon->is_active]
+        );
 
         return response()->json($coupon);
     }

@@ -43,6 +43,7 @@ return [
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'vat_percentage' => env('STRIPE_VAT_PERCENTAGE', 22),
     ],
 
     'gemini' => [
@@ -54,6 +55,11 @@ return [
         'merchant_id'    => env('CRYPTOMUS_MERCHANT_ID'),
         'api_key'        => env('CRYPTOMUS_API_KEY'),
         'webhook_secret' => env('CRYPTOMUS_WEBHOOK_SECRET'),
+        'vat_percentage' => env('CRYPTOMUS_VAT_PERCENTAGE', 0),
+    ],
+
+    'manual' => [
+        'vat_percentage' => env('MANUAL_VAT_PERCENTAGE', 0),
     ],
 
     'google' => [

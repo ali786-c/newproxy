@@ -28,6 +28,14 @@ class CurrencyController extends Controller
         ]);
 
         $currency = SupportedCurrency::create($validated);
+
+        \App\Models\AdminLog::log(
+            'create_currency',
+            "Added supported currency: {$currency->code} ({$currency->name})",
+            null,
+            $validated
+        );
+
         return response()->json($currency, 201);
     }
 
@@ -43,6 +51,14 @@ class CurrencyController extends Controller
         ]);
 
         $currency->update($validated);
+
+        \App\Models\AdminLog::log(
+            'update_currency',
+            "Updated currency: {$currency->code}",
+            null,
+            $validated
+        );
+
         return response()->json($currency);
     }
 
@@ -51,6 +67,13 @@ class CurrencyController extends Controller
         $currency = SupportedCurrency::findOrFail($id);
         $currency->is_active = !$currency->is_active;
         $currency->save();
+
+        \App\Models\AdminLog::log(
+            'toggle_currency',
+            "Toggled active status for currency: {$currency->code} (Now: " . ($currency->is_active ? 'Active' : 'Inactive') . ")",
+            null,
+            ['id' => $id, 'is_active' => $currency->is_active]
+        );
 
         return response()->json($currency);
     }

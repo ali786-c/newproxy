@@ -196,7 +196,7 @@ class BillingController extends Controller
 
         } catch (\Stripe\Exception\AuthenticationException $e) {
             Log::error('Stripe Auth Error: ' . $e->getMessage());
-            return response()->json(['message' => 'Payment gateway authentication failed. Please contact support.'], 503);
+            return response()->json(['message' => 'Stripe Authentication Failed: The API keys provided are invalid or expired. Please check your Admin Settings.'], 422);
         } catch (\Stripe\Exception\ApiErrorException $e) {
             Log::error('Stripe API Error: ' . $e->getMessage());
             return response()->json(['message' => 'Payment error: ' . $e->getMessage()], 422);
@@ -403,6 +403,236 @@ class BillingController extends Controller
         $this->fulfillCryptomusPayment($data, $uuid, $metadata);
 
         return response()->json(['status' => 'success']);
+    }
+
+    public function createNowPaymentsCheckout(Request $request)
+    {
+        $request->validate([
+            'amount' => 'required|numeric|min:1',
+            'coupon_code' => 'nullable|string',
+        ]);
+
+        $netAmount = (float) $request->amount;
+        $couponCode = $request->coupon_code;
+
+        if ($couponCode) {
+            $coupon = \App\Models\Coupon::where('code', $couponCode)->first();
+            if ($coupon && $coupon->isValid($netAmount)) {
+                $discount = $coupon->calculateDiscount($netAmount);
+                $netAmount = max(0, $netAmount - $discount);
+            }
+        }
+
+        $vatPercentage = (float) Setting::getValue('nowpayments_vat_percentage', 0);
+        $totalAmount = $netAmount * (1 + ($vatPercentage / 100));
+
+        $apiKey = Setting::getValue('nowpayments_api_key');
+        if (!$apiKey) {
+            return response()->json(['error' => 'NowPayments is not configured.'], 400);
+        }
+
+        // Format: NP-TOPUP-{timestamp}-{userId}-{netAmount}
+        $orderId = 'NP-TOPUP-' . time() . '-' . $request->user()->id . '-' . round($netAmount, 2);
+
+        $httpOptions = [
+            'connect_timeout' => 60,
+            'timeout' => 60,
+        ];
+
+        if (app()->environment('local')) {
+            $httpOptions['verify'] = false;
+        }
+
+        $http = \Illuminate\Support\Facades\Http::withHeaders([
+            'x-api-key' => $apiKey,
+            'Content-Type' => 'application/json',
+        ])->withOptions($httpOptions);
+
+        $response = $http->post('https://api.nowpayments.io/v1/invoice', [
+            'price_amount' => round($totalAmount, 2),
+            'price_currency' => 'eur',
+            'ipn_callback_url' => url('/') . '/api/webhook/nowpayments',
+            'order_id' => $orderId,
+            'order_description' => "Wallet Top-up for User #{$request->user()->id}",
+            'success_url' => url('/') . '/app/billing?success=true&gateway=nowpayments',
+            'cancel_url' => url('/') . '/app/billing?canceled=true',
+        ]);
+
+        if ($response->successful()) {
+            return response()->json(['url' => $response->json('invoice_url') ?: 'https://nowpayments.io/payment/?iid=' . $response->json('id')]);
+        }
+
+        \Log::error('NowPayments API Error: ' . $response->body());
+        return response()->json(['error' => 'Could not create NowPayments payment.'], 500);
+    }
+
+    public function handleNowPaymentsWebhook(Request $request)
+    {
+        $payload = $request->all();
+        $signature = $request->header('x-nowpayments-sig');
+        $ipnSecret = Setting::getValue('nowpayments_ipn_secret');
+
+        if (!$ipnSecret) {
+            Log::error('NowPayments Webhook Error: IPN Secret not configured.');
+            return response()->json(['error' => 'IPN Secret not configured'], 401);
+        }
+
+        if (!\App\Helpers\NowPaymentsHelper::verifySignature($payload, $signature, $ipnSecret)) {
+            Log::error('NowPayments Webhook Error: Invalid signature.');
+            return response()->json(['error' => 'Invalid signature'], 400);
+        }
+
+        $paymentStatus = $payload['payment_status'] ?? 'unknown';
+        $orderId = $payload['order_id'] ?? '';
+        $paymentId = $payload['payment_id'] ?? '';
+
+        // Handle terminal failure states or partial payments
+        if ($paymentStatus === 'partially_paid') {
+            Log::error("NowPayments ALERT: Partial payment detected. PaymentID: {$paymentId}. OrderID: {$orderId}. User paid less than required.");
+            return response()->json(['message' => 'Partial payment log recorded']);
+        }
+
+        if (in_array($paymentStatus, ['failed', 'expired', 'refunded', 'rejected'])) {
+            Log::info("NowPayments Status Update: Payment {$paymentId} (Order {$orderId}) was marked as {$paymentStatus}. No balance credited.");
+            return response()->json(['message' => "Payment {$paymentStatus} recorded"]);
+        }
+
+        // Idempotency: already handled?
+        if (WebhookLog::where('event_id', $paymentId)->exists()) {
+            return response()->json(['message' => 'Already processed']);
+        }
+
+        // Handle successful payment statuses
+        if (in_array($paymentStatus, ['finished', 'confirmed'])) {
+            // Extract from order_id (NP-TOPUP-timestamp-userId-netAmount)
+            $parts = explode('-', $orderId);
+            
+            // userId is second to last, netAmount is last
+            $netAmount = end($parts);
+            $userId = preg_match('/^\d+$/', prev($parts)) ? current($parts) : end($parts); // Fallback logic
+            
+            // Safer parsing based on our known format
+            if (count($parts) >= 4) {
+                 $userId = $parts[3];
+                 $netAmount = $parts[4];
+            } else {
+                 $userId = end($parts); // Old format fallback
+                 $netAmount = $payload['price_amount'] ?? 0;
+            }
+
+            $metadata = [
+                'user_id' => $userId,
+                'type' => 'topup',
+                'amount' => $netAmount,
+            ];
+
+            $this->fulfillNowPaymentsPayment($payload, $paymentId, $metadata);
+        }
+
+        return response()->json(['status' => 'success']);
+    }
+
+    protected function fulfillNowPaymentsPayment($data, $uuid, $metadata)
+    {
+        $userId = $metadata['user_id'] ?? null;
+        $type   = $metadata['type'] ?? 'topup';
+        $amount = (float) ($metadata['amount'] ?? ($data['price_amount'] ?? 0));
+
+        if (!$userId) {
+            Log::error("NowPayments Webhook Error: No user_id in metadata for UUID {$uuid}");
+            return;
+        }
+
+        Log::info("START NowPayments Fulfillment for User #{$userId}, UUID: {$uuid}");
+
+        $referralService = app(ReferralService::class);
+
+        // Create initial Fulfillment Monitoring Log
+        $fulfillmentLog = FulfillmentLog::updateOrCreate(
+            ['event_id' => $uuid],
+            [
+                'user_id'  => $userId,
+                'provider' => 'nowpayments',
+                'type'     => $type,
+                'stage'    => 1,
+                'status'   => 'processing',
+                'details'  => [
+                    'payment_id' => $uuid,
+                    'amount'     => $amount,
+                    'currency'   => $data['price_currency'] ?? 'EUR',
+                    'metadata'   => $metadata,
+                    'raw_data'   => $data
+                ]
+            ]
+        );
+
+        try {
+            DB::transaction(function () use ($userId, $amount, $uuid, $type, $metadata, $data, $fulfillmentLog) {
+                $user = User::lockForUpdate()->find($userId);
+                if (!$user) return;
+
+                // Permanently record the invoice
+                \App\Models\Invoice::updateOrCreate(
+                    ['stripe_invoice_id' => "NOWPAY-{$uuid}"],
+                    [
+                        'user_id'     => $user->id,
+                        'amount'      => $amount,
+                        'currency'    => $data['price_currency'] ?? 'EUR',
+                        'status'      => 'paid',
+                        'description' => 'Wallet Top-up (NOWPayments)',
+                    ]
+                );
+
+                // Mark as processed
+                WebhookLog::updateOrCreate(
+                    ['event_id' => $uuid],
+                    ['provider' => 'nowpayments']
+                );
+
+                // Trigger Order Confirmation Email
+                try {
+                    $user->notify(new \App\Notifications\OrderConfirmationNotification([
+                        'user' => ['name' => $user->name],
+                        'order' => [
+                            'id' => $uuid,
+                            'amount' => ($data['price_currency'] ?? 'EUR') . ' ' . $amount
+                        ],
+                        'action_url' => url('/app/billing'),
+                        'year' => date('Y')
+                    ]));
+                } catch (\Exception $e) {
+                    Log::error("Order Confirmation Email Error (NowPayments): " . $e->getMessage());
+                }
+
+                $fulfillmentLog->update(['stage' => 1, 'status' => 'success']);
+            });
+        } catch (\Exception $e) {
+            $fulfillmentLog->update([
+                'status'        => 'failed',
+                'error_message' => "Stage 1 (Billing) Failed: " . $e->getMessage()
+            ]);
+            Log::error("STAGE 1 FAILED for NowPayments User #{$userId}. Error: " . $e->getMessage());
+            return;
+        }
+
+        // STAGE 2 & 3: Credit Balance
+        $user = User::find($userId);
+        if (!$user) return;
+
+        DB::transaction(function () use ($user, $amount, $uuid, $referralService, $fulfillmentLog) {
+            $fulfillmentLog->update(['stage' => 3, 'status' => 'success']);
+            $user->increment('balance', $amount);
+            $transaction = WalletTransaction::create([
+                'user_id'     => $user->id,
+                'type'        => 'credit',
+                'amount'      => $amount,
+                'reference'   => "NOWPAY-{$uuid}",
+                'description' => 'NOWPayments Wallet Top-up',
+            ]);
+            $referralService->awardCommission($user, $amount, "Commission from Wallet Top-up (NOWPayments)", $transaction->id, 'transaction');
+        });
+
+        Log::info("NOWPAYMENTS FULFILLMENT COMPLETE for User #{$userId}, UUID: {$uuid}");
     }
 
     protected function fulfillCryptomusPayment($data, $uuid, $metadata)
@@ -805,7 +1035,7 @@ class BillingController extends Controller
                 }
 
                 // Permanently record the invoice
-                \App\Models\Invoice::updateOrCreate(
+                $invoice = \App\Models\Invoice::updateOrCreate(
                     ['stripe_invoice_id' => $session->id],
                     [
                         'user_id'     => $user->id,
@@ -824,10 +1054,12 @@ class BillingController extends Controller
 
                 // --- NEW: Trigger Order Confirmation Email ---
                 try {
+                    $friendlyOrderId = 'INV-' . str_pad($invoice->id, 6, '0', STR_PAD_LEFT);
+
                     $user->notify(new \App\Notifications\OrderConfirmationNotification([
                         'user' => ['name' => $user->name],
                         'order' => [
-                            'id' => $session->id,
+                            'id' => $friendlyOrderId,
                             'amount' => $currency . ' ' . $paidGross
                         ],
                         'action_url' => url('/app/billing'),
@@ -840,7 +1072,7 @@ class BillingController extends Controller
                         ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_order', [
                             'user' => ['email' => $user->email],
                             'order' => [
-                                'id' => $session->id,
+                                'id' => $friendlyOrderId,
                                 'amount' => $currency . ' ' . $paidGross
                             ],
                             'admin_url' => url('/admin/billing'),
@@ -945,6 +1177,14 @@ class BillingController extends Controller
         'proof_path' => $proofPath,
         'status'     => 'pending',
     ]);
+
+    // Log the user action
+    \App\Models\AdminLog::log(
+        "manual_payment_submission",
+        "User #{$request->user()->id} submitted a manual payment of {$request->amount} {$request->currency}",
+        $request->user()->id,
+        ['txid' => $request->txid, 'binance_id' => $request->binance_id]
+    );
 
     // --- NEW: Alert Admin about manual payment proof ---
     try {
@@ -1256,41 +1496,77 @@ class BillingController extends Controller
             return response()->json(['message' => 'Status is already ' . $newStatus]);
         }
 
-        DB::transaction(function () use ($record, $request, $oldStatus, $newStatus) {
-            $record->status = $newStatus;
-            $record->save();
+        try {
+            DB::transaction(function () use ($record, $request, $oldStatus, $newStatus) {
+                $record->status = $newStatus;
+                $record->save();
 
-            // Balance Reversal Logic for Transactions
-            // If a 'paid' transaction is cancelled/failed, we reverse the balance impact
-            if ($request->source === 'transaction' && $record instanceof WalletTransaction) {
-                $user = User::lockForUpdate()->find($record->user_id);
-                if ($user) {
-                    if ($oldStatus === 'paid' && in_array($newStatus, ['cancelled', 'failed'])) {
-                        // Reverse the original impact
-                        if ($record->type === 'credit') {
-                            $user->balance -= $record->amount;
-                        } else {
-                            $user->balance += $record->amount;
-                        }
-                        $user->save();
-                    } elseif (in_array($oldStatus, ['cancelled', 'failed']) && $newStatus === 'paid') {
-                        // Re-apply the impact
-                        if ($record->type === 'credit') {
-                            $user->balance += $record->amount;
-                        } else {
-                            $user->balance -= $record->amount;
+                // Balance Reversal Logic for Transactions (Phase 5: I1, I2)
+                if ($request->source === 'transaction' && $record instanceof WalletTransaction) {
+                    $user = User::lockForUpdate()->find($record->user_id);
+                    if ($user) {
+                        // TERMINAL FAIL STATES (cancelled, failed, voided)
+                        $isTerminal = in_array($newStatus, ['cancelled', 'failed', 'voided']);
+                        $wasTerminal = in_array($oldStatus, ['cancelled', 'failed', 'voided']);
+
+                        if ($oldStatus === 'paid' && $isTerminal) {
+                            // Reverse the original impact (Clawback)
+                            if ($record->type === 'credit') {
+                                // FIX I1: Balance Floor Guard
+                                if ($user->balance < $record->amount) {
+                                    Log::warning("CRITICAL: Manual clawback for User #{$user->id} resulted in negative balance. [Transaction #{$record->id}]");
+                                }
+                                $user->balance -= $record->amount;
+                            } else {
+                                $user->balance += $record->amount;
+                            }
+                        } elseif ($wasTerminal && $newStatus === 'paid') {
+                            // Re-apply the impact
+                            if ($record->type === 'credit') {
+                                $user->balance += $record->amount;
+                            } else {
+                                // FIX I1: Balance Floor Guard for manual debit
+                                if ($user->balance < $record->amount) {
+                                    Log::warning("CRITICAL: Manual debit for User #{$user->id} resulted in negative balance. [Transaction #{$record->id}]");
+                                }
+                                $user->balance -= $record->amount;
+                            }
                         }
                         $user->save();
                     }
                 }
-            }
 
-            \App\Models\AdminLog::log(
-                'update_financial_status',
-                "{$request->source} #{$record->id} status changed from {$oldStatus} to {$newStatus}",
-                $record->user_id
-            );
-        });
+                // FIX I3: User Notification
+                $user = User::find($record->user_id);
+                if ($user) {
+                    try {
+                        $user->notify(new \App\Notifications\GenericDynamicNotification('invoice_status_updated', [
+                            'user' => ['name' => $user->name],
+                            'record' => [
+                                'id' => ($request->source === 'invoice' ? 'INV-' : 'TX-') . $record->id,
+                                'description' => $record->description,
+                                'old_status' => $oldStatus,
+                                'new_status' => $newStatus,
+                                'amount' => $record->amount . ' ' . ($record->currency ?? 'EUR')
+                            ],
+                            'action_url' => url('/app/billing'),
+                            'year' => date('Y')
+                        ]));
+                    } catch (\Exception $e) {
+                        Log::error("Failed to notify user about invoice status change: " . $e->getMessage());
+                    }
+                }
+
+                \App\Models\AdminLog::log(
+                    'update_financial_status',
+                    "{$request->source} #{$record->id} status changed from {$oldStatus} to {$newStatus}",
+                    $record->user_id
+                );
+            });
+        } catch (\Exception $e) {
+            Log::error("Invoice status update failed: " . $e->getMessage());
+            return response()->json(['error' => 'Failed to update record. ' . $e->getMessage()], 500);
+        }
 
         return response()->json(['message' => 'Status updated successfully', 'record' => $record]);
     }
@@ -1324,7 +1600,12 @@ class BillingController extends Controller
                 $stripeStatus = 'connected';
             } catch (\Exception $e) {
                 Log::warning("Stripe Connection Error: " . $e->getMessage());
-                $stripeStatus = 'error';
+                // Check if it's a known placeholder
+                if (str_contains($stripeSecret, 'very_secret_key')) {
+                    $stripeStatus = 'placeholder_key';
+                } else {
+                    $stripeStatus = 'error';
+                }
             }
         }
 
@@ -1342,6 +1623,13 @@ class BillingController extends Controller
                     'name' => 'Cryptomus',
                     'status' => Setting::getValue('cryptomus_merchant_id') ? 'connected' : 'not_configured',
                     'webhook_health' => Setting::getValue('cryptomus_webhook_secret') ? 'good' : 'missing',
+                    'last_sync' => now()->toIso8601String(),
+                ],
+                [
+                    'id' => 'nowpayments',
+                    'name' => 'NowPayments',
+                    'status' => Setting::getValue('nowpayments_api_key') ? 'connected' : 'not_configured',
+                    'webhook_health' => Setting::getValue('nowpayments_ipn_secret') ? 'good' : 'missing',
                     'last_sync' => now()->toIso8601String(),
                 ],
                 [
@@ -1368,7 +1656,14 @@ class BillingController extends Controller
         return response()->json([
             'stripe' => !empty(Setting::getValue('stripe_publishable_key')) && Setting::getValue('gateway_stripe_enabled') == '1',
             'cryptomus' => !empty(Setting::getValue('cryptomus_merchant_id')) && Setting::getValue('gateway_cryptomus_enabled') == '1',
+            'nowpayments' => !empty(Setting::getValue('nowpayments_api_key')) && Setting::getValue('gateway_nowpayments_enabled') == '1',
             'crypto' => !empty(Setting::getValue('binance_pay_id')) && Setting::getValue('gateway_crypto_enabled') == '1',
+            'stripe_vat' => (float) Setting::getValue('stripe_vat_percentage', 22),
+            'cryptomus_vat' => (float) Setting::getValue('cryptomus_vat_percentage', 0),
+            'nowpayments_vat' => (float) Setting::getValue('nowpayments_vat_percentage', 0),
+            'manual_vat' => (float) Setting::getValue('manual_vat_percentage', 0),
+            'binance_pay_id' => Setting::getValue('binance_pay_id'),
+            'binance_pay_instructions' => Setting::getValue('binance_pay_instructions'),
         ]);
     }
     /**
@@ -1409,7 +1704,8 @@ class BillingController extends Controller
         }
 
         $amount = (float) $settings['amount'];
-        $amountWithVAT = $amount * 1.22;
+        $vatPercentage = (float) Setting::getValue('stripe_vat_percentage', 22);
+        $amountWithVAT = $amount * (1 + ($vatPercentage / 100));
 
         try {
             Log::info("Attempting off-session charge of \${$amount} for User #{$user->id}");

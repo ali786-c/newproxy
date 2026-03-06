@@ -53,6 +53,11 @@ class User extends Authenticatable
         'evomi_username',
         'evomi_subuser_id',
         'evomi_keys',
+        // FIX U4: Hide payment and tracking fields from API serialization.
+        // These are sensitive and never needed in the frontend user list/detail.
+        'stripe_customer_id',
+        'default_payment_method',
+        'signup_ip',
     ];
 
     /**

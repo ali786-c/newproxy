@@ -254,6 +254,61 @@ HTML;
                              <a href="{{admin_url}}" style="display:inline-block; background:#0f172a; color:#ffffff; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px;">View Ticket</a>',
                 'variables' => ['user.email', 'ticket.subject', 'ticket.priority', 'admin_url', 'year'],
             ],
+            [
+                'key' => 'invoice_status_updated',
+                'name' => 'Financial Record Status Updated',
+                'subject' => 'Update on your Financial Record ({{record.id}})',
+                'content' => '<h2 style="margin:0 0 16px; font-size:20px; color:#0f172a;">Status Updated</h2>
+                             <p style="margin:0 0 16px; font-size:14px; color:#334155; line-height:1.7;">Hello {{user.name}}, the status of your financial record <strong>{{record.id}}</strong> ({{record.description}}) has been updated by an administrator.</p>
+                             <div style="background:#f8fafc; padding:20px; border-radius:8px; margin-bottom:20px; border:1px solid #e2e8f0;">
+                                <p style="margin:0 0 8px; font-size:14px;"><strong>Old Status:</strong> {{record.old_status}}</p>
+                                <p style="margin:0 0 8px; font-size:14px;"><strong>New Status:</strong> <span style="color:#25935f; font-weight:700;">{{record.new_status}}</span></p>
+                                <p style="margin:0; font-size:14px;"><strong>Amount:</strong> {{record.amount}}</p>
+                             </div>
+                             <a href="{{action_url}}" style="display:inline-block; background:#25935f; color:#ffffff; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px;">View Billing History</a>',
+                'variables' => ['user.name', 'record.id', 'record.description', 'record.old_status', 'record.new_status', 'record.amount', 'action_url', 'year'],
+            ],
+            [
+                'key' => 'influencer_rate_updated',
+                'name' => 'Influencer Rate Updated',
+                'subject' => 'Your custom referral rate has been updated',
+                'content' => '<h2 style="margin:0 0 16px; font-size:20px; color:#0f172a;">Commission Rate Updated</h2>
+                             <p style="margin:0 0 16px; font-size:14px; color:#334155; line-height:1.7;">Hello {{user.name}}, your custom commission rate for the referral program has been updated.</p>
+                             <div style="background:#f8fafc; padding:20px; border-radius:8px; margin-bottom:20px; border:1px solid #e2e8f0;">
+                                <p style="margin:0 0 8px; font-size:14px;"><strong>Previous Rate:</strong> {{old_rate}}</p>
+                                <p style="margin:0; font-size:14px;"><strong>New Rate:</strong> <span style="color:#25935f; font-weight:700;">{{new_rate}}</span></p>
+                             </div>
+                             <p style="margin:0 0 20px; font-size:14px; color:#334155;">This rate applies to all new eligible commissions earned from your referrals.</p>
+                             <a href="{{action_url}}" style="display:inline-block; background:#25935f; color:#ffffff; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px;">View Referral Panel</a>',
+                'variables' => ['user.name', 'old_rate', 'new_rate', 'action_url', 'year'],
+            ],
+            [
+                'key' => 'referral_commission_released',
+                'name' => 'Referral Commission Released',
+                'subject' => 'Referral Commission Released: {{amount}}',
+                'content' => '<h2 style="margin:0 0 16px; font-size:20px; color:#0f172a;">Funds Released</h2>
+                             <p style="margin:0 0 16px; font-size:14px; color:#334155; line-height:1.7;">Hello {{user.name}}, a referral commission of <strong>{{amount}}</strong> has been released to your wallet balance.</p>
+                             <div style="background:#f8fafc; padding:20px; border-radius:8px; margin-bottom:20px; border:1px solid #e2e8f0;">
+                                <p style="margin:0 0 4px; font-size:14px;"><strong>Amount:</strong> {{amount}}</p>
+                                <p style="margin:0; font-size:14px;"><strong>Description:</strong> {{description}}</p>
+                             </div>
+                             <a href="{{action_url}}" style="display:inline-block; background:#25935f; color:#ffffff; padding:12px 24px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px;">View Wallet Balance</a>',
+                'variables' => ['user.name', 'amount', 'description', 'action_url', 'year'],
+            ],
+            [
+                'key' => 'referral_commission_voided',
+                'name' => 'Referral Commission Voided',
+                'subject' => 'Update on Referral Commission ({{amount}})',
+                'content' => '<h2 style="margin:0 0 16px; font-size:20px; color:#e11d48;">Commission Voided</h2>
+                             <p style="margin:0 0 16px; font-size:14px; color:#334155; line-height:1.7;">Hello {{user.name}}, we are writing to inform you that a pending referral commission of <strong>{{amount}}</strong> has been voided.</p>
+                             <div style="background:#f8fafc; padding:20px; border-radius:8px; margin-bottom:20px; border:1px solid #e11d4833;">
+                                <p style="margin:0 0 4px; font-size:14px;"><strong>Amount:</strong> {{amount}}</p>
+                                <p style="margin:0; font-size:14px;"><strong>Description:</strong> {{description}}</p>
+                                <p style="margin:8px 0 0; font-size:14px;"><strong>Status:</strong> {{status}}</p>
+                             </div>
+                             <p style="margin:0; font-size:14px; color:#64748b;">If you believe this is an error, please contact support.</p>',
+                'variables' => ['user.name', 'amount', 'description', 'status', 'year'],
+            ],
         ];
 
         foreach ($templates as $t) {

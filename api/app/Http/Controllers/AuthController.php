@@ -171,11 +171,19 @@ class AuthController extends Controller
                 $user->save();
             }
         } else {
-            $valid = app(\PragmaRX\Google2FALaravel\Google2FA::class)->verifyKey($user->two_factor_secret, $request->code);
+            try {
+                $valid = app(\PragmaRX\Google2FALaravel\Google2FA::class)->verifyKey($user->two_factor_secret, $request->code);
+            } catch (\PragmaRX\Google2FA\Exceptions\IncompatibleWithGoogleAuthenticatorException $e) {
+                $valid = false;
+                \Illuminate\Support\Facades\Log::warning("Corrupted 2FA secret for user {$user->id}. Exception: " . $e->getMessage());
+            } catch (\Exception $e) {
+                $valid = false;
+                \Illuminate\Support\Facades\Log::error("2FA Verification Error for user {$user->id}: " . $e->getMessage());
+            }
         }
 
         if (!$valid) {
-            return response()->json(['message' => 'Invalid verification code.'], 422);
+            return response()->json(['message' => 'Invalid verification code or corrupted 2FA setup.'], 422);
         }
 
         Cache::forget("2fa_challenge_{$request->challenge_token}");
@@ -316,8 +324,9 @@ class AuthController extends Controller
         $user = $request->user();
 
         $request->validate([
-            'name'     => 'nullable|string|max:255',
-            'password' => 'nullable|string|min:8|confirmed',
+            'name'             => 'nullable|string|max:255',
+            'current_password' => 'required_with:password|string',
+            'password'         => 'nullable|string|min:8|confirmed',
         ]);
 
         if ($request->name) {
@@ -325,7 +334,19 @@ class AuthController extends Controller
         }
 
         if ($request->password) {
+            // Verify current password
+            if (!Hash::check($request->current_password, $user->password)) {
+                return response()->json(['message' => 'The provided current password does not match our records.'], 422);
+            }
+
             $user->password = Hash::make($request->password);
+
+            // Audit Log for password change
+            \App\Models\AdminLog::log(
+                'password_changed',
+                "User #{$user->id} ({$user->email}) changed their password.",
+                $user->id
+            );
         }
 
         $user->save();
