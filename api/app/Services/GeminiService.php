@@ -142,19 +142,18 @@ RULES:
    - CTA: Concise call to action.
 
 6. Image Generation Prompt (CRITICAL):
-   - Generate a premium SaaS blog hero image prompt in English.
-   - Visual Style Buckets (Choose ONE unique direction for this post):
-     1) Editorial 3D product render (black/graphite materials).
-     2) Clean enterprise infrastructure photography style (server hardware macro).
-     3) Isometric systems diagram aesthetic (sleek, non-neon).
-     4) Minimal abstract glass-and-metal data visualization.
-     5) Luxury dark-mode tech composition.
-   - Anti-Repetition Rules:
-     - DO NOT use glowing spheres, holographic globes, or floating cubes.
-     - AVOID generic cyberpunk blue/purple neon circuits.
-     - NO random world maps or cityscapes.
-   - Composition: Wide cinematic banner style (16:9).
-   - Constraints: NO text, NO logos, NO watermarks, NO people.
+   - Task: Generate a world-class prompt for Imagen 3 that VISUALLY ILLUSTRATES the core message or metaphor of your blog post.
+   - Core Concept: Do not just generate "generic tech art". Use the blog's title and hook as inspiration.
+   - Example Directions (Choose ONLY ONE based on the blog's unique angle):
+     - METAPHORICAL: (e.g., A golden key unlocking a digital vault for "Access", a lighthouse in a digital sea for "Guidance").
+     - EDITORIAL/PRODUCT: (e.g., A sleek, macro shot of server hardware with elegant lighting for "Infrastructure").
+     - LIFESTYLE: (e.g., A person in a serene modern cafe using a laptop, with subtle digital connectivity lines in the air for "Remote Work/Privacy").
+     - DATA VIZ: (e.g., A clean 3D isometric representation of data pipelines flowing into a central hub).
+   - Rules:
+     - The image must look like a high-end cover for a premium tech magazine (like Wired or Fast Company).
+     - Diversity: AVOID the "glowing holographic sphere" or "neon circuit" clichés.
+     - PROHIBITED: No text, no letters, no UI labels, no watermarks, no messy overlaps.
+     - Quality: Include "hyper-realistic, 8k, professional studio lighting, shallow depth of field, sharp focus, clean composition".
 
 OUTPUT FORMAT (Strict JSON):
 {
@@ -170,7 +169,7 @@ OUTPUT FORMAT (Strict JSON):
     { "q": "Question?", "a": "Answer text." }
   ],
   "cta": "Call to action text",
-  "image_prompt": "A [Chosen Visual Bucket Style] of [Specific Concept relating to {$keyword}]. Composition: Wide-angle cinematic. Lighting: Professional studio lighting. Texture: Realistic brushed metal/glass. Quality: 8k, hyper-realistic, no text."
+  "image_prompt": "A [Specific Style: e.g. Cinematic Lifestyle, Minimalist 3D Render, or Macro Photography] of [Specific Scenographic Concept that illustrates the blog's title]. Environment: [Lighting & Mood]. Technical: 8k resolution, hyper-realistic, shallow depth of field, no text."
 }
 PROMPT;
     }
