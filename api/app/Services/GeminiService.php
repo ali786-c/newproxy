@@ -132,7 +132,13 @@ RULES:
    - Takeaways: 3-4 bullet points.
    - FAQ: 2-3 common questions and answers.
    - CTA: Concise call to action.
-6. Image Prompt: A detailed descriptive prompt for a photorealistic, high-resolution, tech-oriented featured image.
+6. Image Generation Prompt (CRITICAL):
+   - You must generate a highly detailed, professional prompt for an AI image generator.
+   - Quality: Include terms like "hyper-realistic", "8k resolution", "highly detailed textures", "cinematic lighting".
+   - Diversity: For every blog, choose a UNIQUE visual style (e.g., Minimalist 3D, Cyberpunk, Corporate Memphis - but refined, Macro Photography, Neomorphism, or High-End Tech Noir).
+   - Composition: Specify camera angle (e.g., "wide shot", "top-down", "close-up macro") and depth of field ("bokeh background").
+   - NO TEXT: The image must NOT contain any text, letters, or words.
+   - No People: Focus on abstract tech, servers, digital networks, or hardware.
 
 OUTPUT FORMAT (Strict JSON):
 {
@@ -148,7 +154,7 @@ OUTPUT FORMAT (Strict JSON):
     { "q": "Question?", "a": "Answer text." }
   ],
   "cta": "Call to action text",
-  "image_prompt": "Detailed description for AI image generation"
+  "image_prompt": "A [Visual Style] of [Specific Subject] relating to {$keyword}. Composition: [Angle]. Lighting: [Lighting Type]. Extra detail: [Specific visual element]. Quality: hyper-realistic, 8k, photorealistic textures. No text."
 }
 PROMPT;
     }
