@@ -131,16 +131,7 @@ class GeminiService
         $response = Http::withoutVerifying()->timeout(150)->post($url, [
             'contents' => [
                 ['parts' => [['text' => $imagePrompt]]]
-            ],
-            'generationConfig' => [
-                'temperature' => 0.7,
-            ],
-            // As per Imagen docs, imageConfig sits outside generationConfig for some model endpoints
-            // However, Gemini API schema varies. We'll pass it at the root of the request.
-            'imageConfig' => [
-                'aspectRatio' => '16:9',
-                'imageSize' => '2K',
-            ],
+            ]
         ]);
 
         if ($response->failed()) {
