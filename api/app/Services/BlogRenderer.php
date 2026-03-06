@@ -134,10 +134,10 @@ HTML;
     {
         $cta = $this->formatContent($cta);
         return <<<HTML
-<div class="bg-[#2563eb] rounded-2xl p-8 text-white text-center my-12 shadow-xl shadow-blue-900/10" style="background-color: #2563eb;">
-    <h3 class="text-2xl font-bold mb-4 text-white">Ready to level up your proxy game?</h3>
-    <p class="text-blue-50 mb-6 max-w-xl mx-auto">{$cta}</p>
-    <a href="/dashboard" class="inline-block bg-white text-blue-700 font-bold px-8 py-3 rounded-full hover:bg-blue-50 transition-all transform hover:scale-105 active:scale-95">
+<div class="rounded-3xl p-10 text-center my-12 border" style="background-color: #eef2ff; border-color: #e0e7ff;">
+    <h3 class="text-2xl font-bold mb-4" style="color: #1e1b4b;">Ready to level up your proxy game?</h3>
+    <p class="mb-8 max-w-2xl mx-auto leading-relaxed" style="color: #3730a3;">{$cta}</p>
+    <a href="/dashboard" class="inline-block font-bold px-8 py-4 rounded-full shadow-lg transition-all" style="background-color: #4f46e5; color: white;">
         Get Started Now
     </a>
 </div>

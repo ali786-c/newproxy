@@ -39,16 +39,37 @@ foreach ($posts as $post) {
     // Fix Double Asterisks
     $post->content = preg_replace('/\*\*(.*?)\*\*/', '<strong>$1</strong>', $post->content);
     
-    // Fix CTA Block Visibility (White-on-White to Blue)
-    // We target the old gradient class and replace it with solid blue + direct style as backup
-    if (str_contains($post->content, 'bg-gradient-to-r from-blue-600 to-indigo-800')) {
+    // Fix CTA Block Visibility (Upgrade to Premium Light Theme)
+    // 1. Replace the solid blue version if it exists
+    if (str_contains($post->content, 'bg-[#2563eb]" style="background-color: #2563eb;"')) {
         $post->content = str_replace(
-            'bg-gradient-to-r from-blue-600 to-indigo-800', 
-            'bg-[#2563eb]" style="background-color: #2563eb;', 
+            '<div class="bg-[#2563eb] rounded-2xl p-8 text-white text-center my-12 shadow-xl shadow-blue-900/10" style="background-color: #2563eb;">', 
+            '<div class="rounded-3xl p-10 text-center my-12 border" style="background-color: #eef2ff; border-color: #e0e7ff;">', 
             $post->content
         );
-        // Ensure CTA heading is white
-        $post->content = str_replace('text-2xl font-bold mb-4">', 'text-2xl font-bold mb-4 text-white">', $post->content);
+        $post->content = str_replace('<h3 class="text-2xl font-bold mb-4 text-white">', '<h3 class="text-2xl font-bold mb-4" style="color: #1e1b4b;">', $post->content);
+        $post->content = str_replace('<p class="text-blue-50 mb-6 max-w-xl mx-auto">', '<p class="mb-8 max-w-2xl mx-auto leading-relaxed" style="color: #3730a3;">', $post->content);
+        $post->content = str_replace(
+            '<a href="/dashboard" class="inline-block bg-white text-blue-700 font-bold px-8 py-3 rounded-full hover:bg-blue-50 transition-all transform hover:scale-105 active:scale-95">',
+            '<a href="/dashboard" class="inline-block font-bold px-8 py-4 rounded-full shadow-lg transition-all" style="background-color: #4f46e5; color: white;">',
+            $post->content
+        );
+    }
+    
+    // 2. Replace the gradient version if it exists
+    if (str_contains($post->content, 'bg-gradient-to-r from-blue-600 to-indigo-800')) {
+        $post->content = str_replace(
+            '<div class="bg-gradient-to-r from-blue-600 to-indigo-800 rounded-2xl p-8 text-white text-center my-12 shadow-xl shadow-blue-900/10">', 
+            '<div class="rounded-3xl p-10 text-center my-12 border" style="background-color: #eef2ff; border-color: #e0e7ff;">', 
+            $post->content
+        );
+        $post->content = str_replace('<h3 class="text-2xl font-bold mb-4">', '<h3 class="text-2xl font-bold mb-4" style="color: #1e1b4b;">', $post->content);
+        $post->content = str_replace('<p class="text-blue-100 mb-6 max-w-xl mx-auto">', '<p class="mb-8 max-w-2xl mx-auto leading-relaxed" style="color: #3730a3;">', $post->content);
+        $post->content = str_replace(
+            '<a href="/dashboard" class="inline-block bg-white text-blue-700 font-bold px-8 py-3 rounded-full hover:bg-blue-50 transition-all transform hover:scale-105 active:scale-95">',
+            '<a href="/dashboard" class="inline-block font-bold px-8 py-4 rounded-full shadow-lg transition-all" style="background-color: #4f46e5; color: white;">',
+            $post->content
+        );
     }
 
     if ($post->content !== $oldContent || $updated) {
