@@ -14,6 +14,8 @@ class BlogPost extends Model
         'category',
         'tags',
         'image_url',
+        'image_prompt',
+        'image_source',
         'author_id',
         'published_at',
         'reading_time_min',

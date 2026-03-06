@@ -107,7 +107,7 @@ class AutoBlogController extends Controller
     /**
      * Admin: Manually trigger a blog post generation.
      */
-    public function trigger(Request $request, GeminiService $gemini)
+    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer)
     {
         $keywordObj = null;
 
@@ -125,57 +125,82 @@ class AutoBlogController extends Controller
         }
 
         try {
-            $rawResponse = $gemini->generateBlogPost($keywordObj->keyword);
+            // 1. Fetch recent titles for diversity
+            $recentTitles = BlogPost::latest()->take(10)->pluck('title')->toArray();
 
-            // Robustly extract JSON object from the response
-            if (preg_match('/\{.*\}/s', $rawResponse, $matches)) {
-                $data = json_decode($matches[0], true);
-            } else {
-                $data = null;
+            // 2. Generate Structured Content (with retry)
+            $blogData = null;
+            $maxRetries = 2;
+            $attempt = 0;
+
+            while ($attempt < $maxRetries) {
+                $attempt++;
+                try {
+                    $blogData = $gemini->generateBlogPost(
+                        $keywordObj->keyword, 
+                        $keywordObj->category ?? 'General', 
+                        $recentTitles
+                    );
+
+                    // Validate word count (heuristic: total chars / 6)
+                    $totalContent = '';
+                    foreach ($blogData['sections'] as $s) $totalContent .= $s['content'];
+                    $wordCount = str_word_count(strip_tags($totalContent));
+
+                    if ($wordCount >= 400 && $wordCount <= 900) break; 
+                    
+                    \Illuminate\Support\Facades\Log::info("Word count out of range ({$wordCount}), retrying...", ['attempt' => $attempt]);
+                } catch (\Exception $e) {
+                    if ($attempt >= $maxRetries) throw $e;
+                    \Illuminate\Support\Facades\Log::warning("AI Generation attempt {$attempt} failed, retrying...", ['error' => $e->getMessage()]);
+                }
             }
 
-            if (!$data || !isset($data['title'], $data['content'], $data['excerpt'])) {
-                \Illuminate\Support\Facades\Log::warning('AI Response Parsing Failed', [
-                    'raw_response' => $rawResponse,
-                    'regex_matches' => $matches ?? null,
-                    'json_error' => json_last_error_msg()
-                ]);
-                throw new \Exception('Invalid or missing JSON fields in AI response. See logs for raw response.');
+            // 3. Generate Featured Image
+            $imageUrl = null;
+            if (!empty($blogData['image_prompt'])) {
+                $imageUrl = $gemini->generateFeaturedImage($blogData['image_prompt']);
             }
 
+            // 4. Render Premium HTML
+            $contentHtml = $renderer->render($blogData);
+
+            // 5. Create the Post
             $post = BlogPost::create([
-                'title'     => $data['title'],
-                'slug'      => Str::slug($data['title']) . '-' . Str::random(5),
-                'content'   => $data['content'],
-                'excerpt'   => $data['excerpt'],
+                'title'     => $blogData['title'],
+                'slug'      => Str::slug($blogData['title']) . '-' . Str::random(5),
+                'content'   => $contentHtml,
+                'excerpt'   => $blogData['excerpt'],
                 'category'  => $keywordObj->category ?? 'General',
+                'image_url' => $imageUrl,
+                'image_prompt' => $blogData['image_prompt'] ?? null,
+                'image_source' => $imageUrl ? 'ai_gemini' : 'none',
                 'is_draft'  => false,
                 'published_at' => now(),
-                'author_id' => null, // System post
+                'author_id' => null,
             ]);
 
             $keywordObj->update(['last_used_at' => now()]);
 
             \App\Models\AdminLog::log(
                 'trigger_autoblog',
-                "Manually triggered AI blog generation for '{$keywordObj->keyword}'",
+                "Generated AI blog via Nano Banana: '{$post->title}'",
                 null,
                 ['post_id' => $post->id, 'keyword' => $keywordObj->keyword]
             );
 
             return response()->json([
-                'message' => 'AI blog post generated and published successfully!',
+                'message' => 'AI blog post generated with custom design and images!',
                 'post' => $post
             ]);
 
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('AI Generation Trigger Failed', [
+            \Illuminate\Support\Facades\Log::error('AI Generation Failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
             return response()->json([
                 'message' => 'AI Generation Failed: ' . $e->getMessage(),
-                'debug' => $e->getTraceAsString()
             ], 500);
         }
     }

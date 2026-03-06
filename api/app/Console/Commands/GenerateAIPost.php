@@ -29,14 +29,12 @@ class GenerateAIPost extends Command
     /**
      * Execute the console command.
      */
-    public function handle(GeminiService $gemini)
+    public function handle(GeminiService $gemini, \App\Services\BlogRenderer $renderer)
     {
-        Log::info('Cron: Starting AI blog generation...');
-        $this->info('Starting AI blog generation...');
+        Log::info('Cron: Starting Robust AI blog generation...');
 
         if (Setting::getValue('auto_blog_enabled', '0') !== '1') {
-            Log::warning('Cron: Auto-blogging is currently disabled in settings.');
-            $this->warn('Auto-blogging is currently disabled in settings.');
+            Log::warning('Cron: Auto-blogging is currently disabled.');
             return;
         }
 
@@ -45,33 +43,39 @@ class GenerateAIPost extends Command
             ->first();
 
         if (!$keywordObj) {
-            $this->error('No active keywords found in the database.');
+            Log::error('Cron: No active keywords found.');
             return;
         }
 
-        $this->info("Generating post for keyword: {$keywordObj->keyword}");
-
         try {
-            $rawResponse = $gemini->generateBlogPost($keywordObj->keyword);
-            
-            // Robustly extract JSON object from the response
-            if (preg_match('/\{.*\}/s', $rawResponse, $matches)) {
-                $data = json_decode($matches[0], true);
-            } else {
-                $data = null;
+            $recentTitles = BlogPost::latest()->take(10)->pluck('title')->toArray();
+
+            // 1. Generate Structured Content
+            $blogData = $gemini->generateBlogPost(
+                $keywordObj->keyword, 
+                $keywordObj->category ?? 'General', 
+                $recentTitles
+            );
+
+            // 2. Generate Image
+            $imageUrl = null;
+            if (!empty($blogData['image_prompt'])) {
+                $imageUrl = $gemini->generateFeaturedImage($blogData['image_prompt']);
             }
 
-            if (!$data || !isset($data['title'], $data['content'], $data['excerpt'])) {
-                $errorMsg = json_last_error_msg();
-                throw new \Exception("Invalid or missing JSON fields in AI response. JSON Error: {$errorMsg}. Raw snippet: " . substr($rawResponse, 0, 100));
-            }
+            // 3. Render
+            $contentHtml = $renderer->render($blogData);
 
+            // 4. Save
             $post = BlogPost::create([
-                'title'     => $data['title'],
-                'slug'      => Str::slug($data['title']) . '-' . Str::random(5),
-                'content'   => $data['content'],
-                'excerpt'   => $data['excerpt'],
+                'title'     => $blogData['title'],
+                'slug'      => Str::slug($blogData['title']) . '-' . Str::random(5),
+                'content'   => $contentHtml,
+                'excerpt'   => $blogData['excerpt'],
                 'category'  => $keywordObj->category ?? 'General',
+                'image_url' => $imageUrl,
+                'image_prompt' => $blogData['image_prompt'] ?? null,
+                'image_source' => $imageUrl ? 'ai_gemini_cron' : 'none',
                 'is_draft'  => false,
                 'published_at' => now(),
                 'author_id' => null,
@@ -79,12 +83,10 @@ class GenerateAIPost extends Command
 
             $keywordObj->update(['last_used_at' => now()]);
 
-            Log::info("Cron: Success! Blog post published: {$post->title}");
-            $this->info("Success! Blog post published: {$post->title}");
+            Log::info("Cron: Success! Blog published: {$post->title}");
             
         } catch (\Exception $e) {
             Log::error("Cron: AI Generation Failed: " . $e->getMessage());
-            $this->error("AI Generation Failed: " . $e->getMessage());
         }
     }
 }
