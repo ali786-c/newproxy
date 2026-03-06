@@ -169,6 +169,7 @@ RULES:
    - {$recentStr}
 4. SEO: Naturally include "{$keyword}" in the first 100 words and at least one H2.
 5. Structure: Hook, Lead, 3-5 Body Sections with headings, Takeaways, FAQs, and CTA.
+6. NO MARKDOWN: Do NOT use markdown symbols like **bold** or _italic_ in the text. Write raw text only.
 
 OUTPUT FORMAT (Strict JSON):
 {

@@ -57,6 +57,8 @@ HTML;
 
     protected function renderHero(string $hook, string $intro): string
     {
+        $hook = $this->formatContent($hook);
+        $intro = $this->formatContent($intro);
         return <<<HTML
 <div class="blog-hero mb-12">
     <p class="text-xl font-medium text-blue-600 mb-4 italic leading-snug">"{$hook}"</p>
@@ -71,6 +73,7 @@ HTML;
     {
         $items = '';
         foreach ($takeaways as $item) {
+            $item = $this->formatContent($item);
             $items .= "<li class='flex items-start mb-2'><span class='text-blue-500 mr-2'>✔</span><span>{$item}</span></li>";
         }
 
@@ -89,6 +92,7 @@ HTML;
 
     protected function renderSection(string $heading, string $content): string
     {
+        $content = $this->formatContent($content);
         return <<<HTML
 <section class="blog-section py-4">
     <h2 class="text-2xl font-bold text-neutral-900 mb-4 tracking-tight border-b border-neutral-100 pb-2">{$heading}</h2>
@@ -103,13 +107,15 @@ HTML;
     {
         $items = '';
         foreach ($faqs as $faq) {
+            $q = $this->formatContent($faq['q']);
+            $a = $this->formatContent($faq['a']);
             $items .= <<<HTML
 <div class="mb-6 group">
     <h4 class="text-md font-bold text-neutral-800 mb-2 flex items-center group-hover:text-blue-600 transition-colors">
         <span class="bg-blue-100 text-blue-700 w-6 h-6 rounded-full flex items-center justify-center text-xs mr-2">Q</span>
-        {$faq['q']}
+        {$q}
     </h4>
-    <p class="text-neutral-600 pl-8 border-l-2 border-neutral-50 ml-3">{$faq['a']}</p>
+    <p class="text-neutral-600 pl-8 border-l-2 border-neutral-50 ml-3">{$a}</p>
 </div>
 HTML;
         }
@@ -126,14 +132,29 @@ HTML;
 
     protected function renderCTA(string $cta): string
     {
+        $cta = $this->formatContent($cta);
         return <<<HTML
-<div class="bg-gradient-to-r from-blue-600 to-indigo-800 rounded-2xl p-8 text-white text-center my-12 shadow-xl shadow-blue-900/10">
-    <h3 class="text-2xl font-bold mb-4">Ready to level up your proxy game?</h3>
-    <p class="text-blue-100 mb-6 max-w-xl mx-auto">{$cta}</p>
+<div class="bg-[#2563eb] rounded-2xl p-8 text-white text-center my-12 shadow-xl shadow-blue-900/10" style="background-color: #2563eb;">
+    <h3 class="text-2xl font-bold mb-4 text-white">Ready to level up your proxy game?</h3>
+    <p class="text-blue-50 mb-6 max-w-xl mx-auto">{$cta}</p>
     <a href="/dashboard" class="inline-block bg-white text-blue-700 font-bold px-8 py-3 rounded-full hover:bg-blue-50 transition-all transform hover:scale-105 active:scale-95">
         Get Started Now
     </a>
 </div>
 HTML;
+    }
+
+    /**
+     * Convert simple markdown fragments to HTML.
+     */
+    protected function formatContent(string $text): string
+    {
+        // Convert **text** to <strong>text</strong>
+        $text = preg_replace('/\*\*(.*?)\*\*/', '<strong class="font-bold text-neutral-900">$1</strong>', $text);
+        
+        // Convert *text* to <em>text</em>
+        $text = preg_replace('/\*(.*?)\*/', '<em class="italic">$1</em>', $text);
+        
+        return $text;
     }
 }
