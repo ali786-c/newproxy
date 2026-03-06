@@ -97,9 +97,22 @@ class GeminiService
 
         try {
             $rawJson = $result['candidates'][0]['content']['parts'][0]['text'];
-            return json_decode($rawJson, true);
+            
+            // Handle markdown code blocks if the AI returned them
+            if (preg_match('/\{.*\}/s', $rawJson, $matches)) {
+                $rawJson = $matches[0];
+            }
+            
+            $data = json_decode($rawJson, true);
+            
+            if (!$data || !isset($data['subject'], $data['environment'], $data['style'])) {
+                Log::warning('Incomplete Image Brief JSON', ['json' => $rawJson]);
+                return null;
+            }
+            
+            return $data;
         } catch (\Exception $e) {
-            Log::error('Failed to parse Image Brief JSON', ['error' => $e->getMessage()]);
+            Log::error('Failed to parse Image Brief JSON', ['error' => $e->getMessage(), 'raw' => $result]);
             return null;
         }
     }
@@ -121,10 +134,12 @@ class GeminiService
             ],
             'generationConfig' => [
                 'temperature' => 0.7,
-                'imageConfig' => [
-                    'aspectRatio' => '16:9',
-                    'imageSize' => '2K',
-                ],
+            ],
+            // As per Imagen docs, imageConfig sits outside generationConfig for some model endpoints
+            // However, Gemini API schema varies. We'll pass it at the root of the request.
+            'imageConfig' => [
+                'aspectRatio' => '16:9',
+                'imageSize' => '2K',
             ],
         ]);
 
@@ -194,13 +209,22 @@ PROMPT;
     {
         $title = $blogData['title'] ?? '';
         $intro = $blogData['intro'] ?? '';
+        $excerpt = $blogData['excerpt'] ?? '';
+        
+        $firstSection = '';
+        if (!empty($blogData['sections']) && is_array($blogData['sections'])) {
+            $firstSectionData = $blogData['sections'][0];
+            $firstSection = ($firstSectionData['heading'] ?? '') . "\n" . ($firstSectionData['content'] ?? '');
+        }
 
         return <<<PROMPT
 You are a professional art director for a technology SaaS blog.
 Task: Create a visual brief for a featured image based strictly on the specific content of this blog.
 
 BLOG TITLE: {$title}
+BLOG EXCERPT: {$excerpt}
 BLOG INTRO: {$intro}
+KEY POINT: {$firstSection}
 
 RULES (CRITICAL):
 1. Extract the specific industry or use-case discussed in the blog (e.g., SEO, Travel, E-commerce, Market Research, Social Media, etc.).
