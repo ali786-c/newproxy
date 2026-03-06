@@ -7,9 +7,14 @@ class BlogRenderer
     /**
      * Render the entire blog post as high-quality Tailwind HTML.
      */
-    public function render(array $data): string
+    public function render(array $data, ?string $imageUrl = null): string
     {
         $html = '<div class="blog-content space-y-8 text-neutral-800 leading-relaxed">';
+
+        // 0. Featured Image
+        if ($imageUrl) {
+            $html .= $this->renderFeaturedImage($imageUrl, $data['title'] ?? 'Blog Image');
+        }
 
         // 1. Hero Section (Hook + Intro)
         $html .= $this->renderHero($data['hook'] ?? '', $data['intro'] ?? '');
@@ -39,6 +44,15 @@ class BlogRenderer
         $html .= '</div>';
 
         return $html;
+    }
+
+    protected function renderFeaturedImage(string $url, string $alt): string
+    {
+        return <<<HTML
+<div className="blog-featured-image mb-8 overflow-hidden rounded-2xl shadow-lg border border-neutral-100">
+    <img src="{$url}" alt="{$alt}" class="w-full h-auto object-cover max-h-[500px]" />
+</div>
+HTML;
     }
 
     protected function renderHero(string $hook, string $intro): string

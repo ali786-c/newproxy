@@ -64,7 +64,7 @@ class GenerateAIPost extends Command
             }
 
             // 3. Render
-            $contentHtml = $renderer->render($blogData);
+            $contentHtml = $renderer->render($blogData, $imageUrl);
 
             // 4. Save
             $post = BlogPost::create([

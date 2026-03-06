@@ -163,7 +163,7 @@ class AutoBlogController extends Controller
             }
 
             // 4. Render Premium HTML
-            $contentHtml = $renderer->render($blogData);
+            $contentHtml = $renderer->render($blogData, $imageUrl);
 
             // 5. Create the Post
             $post = BlogPost::create([
