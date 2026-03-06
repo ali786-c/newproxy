@@ -49,7 +49,7 @@ class BlogRenderer
     protected function renderFeaturedImage(string $url, string $alt): string
     {
         return <<<HTML
-<div className="blog-featured-image mb-8 overflow-hidden rounded-2xl shadow-lg border border-neutral-100">
+<div class="blog-featured-image mb-8 overflow-hidden rounded-2xl shadow-lg border border-neutral-100">
     <img src="{$url}" alt="{$alt}" class="w-full h-auto object-cover max-h-[500px]" />
 </div>
 HTML;
