@@ -289,6 +289,6 @@ PROMPT;
 
         Storage::disk('public')->put($path, $imageData);
 
-        return Storage::url($path);
+        return Storage::disk('public')->url($path);
     }
 }
