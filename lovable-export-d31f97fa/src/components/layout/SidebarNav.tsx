@@ -81,7 +81,7 @@ const CLIENT_SECTIONS: NavSection[] = [
       { title: "Datacenter (Unmetered)", url: "/app/proxies/datacenter-unmetered", icon: Server },
     ],
   },
-  {
+  /* {
     label: "Scraping Solutions",
     collapsible: true,
     defaultOpen: false,
@@ -89,7 +89,7 @@ const CLIENT_SECTIONS: NavSection[] = [
       { title: "Scraper API", url: "/app/scraper-api", icon: Code, badge: "Beta" },
       { title: "Scraping Browser", url: "/app/scraping-browser", icon: MonitorSmartphone, badge: "Beta" },
     ],
-  },
+  }, */
   {
     label: "Earn",
     items: [
@@ -260,7 +260,7 @@ export function SidebarNav() {
         { title: "Datacenter (Unmetered)", url: "/app/proxies/datacenter-unmetered", icon: Server },
       ],
     },
-    {
+    /* {
       label: "Scraping Solutions",
       collapsible: true,
       defaultOpen: false,
@@ -268,7 +268,7 @@ export function SidebarNav() {
         { title: "Scraper API", url: "/app/scraper-api", icon: Code, badge: "Beta" },
         { title: "Scraping Browser", url: "/app/scraping-browser", icon: MonitorSmartphone, badge: "Beta" },
       ],
-    },
+    }, */
     {
       label: "Earn",
       items: [
