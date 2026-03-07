@@ -137,7 +137,7 @@ HTML;
 <div class="rounded-3xl p-10 text-center my-12 border" style="background-color: #eef2ff; border-color: #e0e7ff;">
     <h3 class="text-2xl font-bold mb-4" style="color: #1e1b4b;">Ready to level up your proxy game?</h3>
     <p class="mb-8 max-w-2xl mx-auto leading-relaxed" style="color: #3730a3;">{$cta}</p>
-    <a href="/dashboard" class="inline-block font-bold px-8 py-4 rounded-full shadow-lg transition-all" style="background-color: #4f46e5; color: white;">
+    <a href="/app" class="inline-block font-bold px-8 py-4 rounded-full shadow-lg transition-all" style="background-color: #4f46e5; color: white;">
         Get Started Now
     </a>
 </div>
