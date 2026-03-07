@@ -2,6 +2,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Settings, Shield } from "lucide-react";
+import { LogOut, User, Settings, Shield, Sun, Moon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -21,6 +22,7 @@ import { Wallet } from "lucide-react";
 export function Topbar() {
   const { user, logout } = useAuth();
   const { format } = useCurrency();
+  const { theme, toggleTheme } = useTheme();
   const settingsPath = user?.role === "admin" ? "/admin" : "/app/settings";
 
   return (
@@ -45,6 +47,9 @@ export function Topbar() {
         )}
         <CurrencySwitcher />
         <LanguageSwitcher />
+        <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8" aria-label="Toggle theme">
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
         <NotificationCenter />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
