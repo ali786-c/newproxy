@@ -103,7 +103,7 @@ const CLIENT_SECTIONS: NavSection[] = [
       { title: "Invoices", url: "/app/invoices", icon: Receipt },
       { title: "Security & 2FA", url: "/app/security", icon: Shield },
       { title: "Organization", url: "/app/organization", icon: Building2 },
-      { title: "Custom Domains", url: "/app/custom-domains", icon: Globe },
+      // { title: "Custom Domains", url: "/app/custom-domains", icon: Globe }, // Hidden for now
     ],
   },
   {
@@ -282,7 +282,7 @@ export function SidebarNav() {
         { title: t("nav.invoices"), url: "/app/invoices", icon: Receipt },
         { title: t("nav.security"), url: "/app/security", icon: Shield },
         { title: t("nav.organization"), url: "/app/organization", icon: Building2 },
-        { title: "Custom Domains", url: "/app/custom-domains", icon: Globe },
+        // { title: "Custom Domains", url: "/app/custom-domains", icon: Globe }, // Hidden for now
       ],
     },
     {
