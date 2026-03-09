@@ -42,7 +42,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'name'             => 'required|string|max:255',
-            'type'             => 'required|string|in:rp,dc,mp,isp,dc_ipv6,dc_unmetered',
+            'type'             => 'required|string|in:rp,dc,mp,isp,dc_ipv6,dc_unmetered,isp_shared,isp_private,isp_virgin',
             'unit'             => 'nullable|string|in:GB,IP,Month',
             // FIX P6: Add max price to prevent accidental extreme values.
             'price'            => 'required|numeric|min:0|max:999999',
@@ -78,7 +78,7 @@ class ProductController extends Controller
 
         $validated = $request->validate([
             'name'             => 'sometimes|required|string|max:255',
-            'type'             => 'sometimes|required|string|in:rp,dc,mp,isp,dc_ipv6,dc_unmetered',
+            'type'             => 'sometimes|required|string|in:rp,dc,mp,isp,dc_ipv6,dc_unmetered,isp_shared,isp_private,isp_virgin',
             'unit'             => 'nullable|string|in:GB,IP,Month',
             // FIX P6: Add max price to prevent accidental extreme values.
             'price'            => 'sometimes|required|numeric|min:0|max:999999',

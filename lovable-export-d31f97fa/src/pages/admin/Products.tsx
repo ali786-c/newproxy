@@ -315,7 +315,7 @@ export default function AdminProducts() {
           <CardContent className="py-4">
             <p className="text-sm font-medium">Pricing Model</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              All products use flat-rate pricing in EUR but support optional volume-based discounting. 
+              All products use flat-rate pricing in EUR but support optional volume-based discounting.
               The sell price is calculated as base cost × (1 + markup%).
             </p>
           </CardContent>
@@ -350,7 +350,10 @@ export default function AdminProducts() {
                     <SelectItem value="rp">Residential (rp)</SelectItem>
                     <SelectItem value="dc">Datacenter (dc)</SelectItem>
                     <SelectItem value="mp">Mobile (mp)</SelectItem>
-                    <SelectItem value="isp">Static/ISP (isp)</SelectItem>
+                    <SelectItem value="isp">General ISP (isp)</SelectItem>
+                    <SelectItem value="isp_shared">Shared Static ISP (isp_shared)</SelectItem>
+                    <SelectItem value="isp_private">Private Static ISP (isp_private)</SelectItem>
+                    <SelectItem value="isp_virgin">Virgin Static ISP (isp_virgin)</SelectItem>
                     <SelectItem value="dc_ipv6">Datacenter IPv6 (dc_ipv6)</SelectItem>
                     <SelectItem value="dc_unmetered">Datacenter Unmetered (dc_unmetered)</SelectItem>
                   </SelectContent>

@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Download, Loader2, CreditCard, Wallet, Bitcoin } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useProducts, useGenerateProxy } from "@/hooks/use-backend";
+import { useProducts, useGenerateProxy, useIspStock, useOrderIsp } from "@/hooks/use-backend";
 import { clientApi } from "@/lib/api/dashboard";
 import evomiCountries from "@/lib/data/countries.json";
 import {
@@ -99,10 +99,18 @@ export default function Proxies() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [proxies, setProxies] = useState<any[]>([]);
+  const [ispCountry, setIspCountry] = useState("");
+  const [ispCity, setIspCity] = useState("");
+  const [ispName, setIspName] = useState("");
+  const [ispMonths, setIspMonths] = useState(1);
   const { format } = useCurrency();
   const { t } = useI18n();
 
   const selectedProductData = (products ?? []).find((p: any) => p.id.toString() === product);
+
+  const isIspProduct = productType?.startsWith("isp_") ?? false;
+  const { data: ispStockData, isLoading: isLoadingIspStock } = useIspStock();
+  const orderIsp = useOrderIsp();
 
   const liveCostInfo = useMemo(() => {
     if (!selectedProductData) return null;
@@ -118,13 +126,38 @@ export default function Proxies() {
     }
 
     const basePrice = Number(selectedProductData.price);
-    const total = unitPrice * quantity;
+    const multiplier = isIspProduct ? quantity * ispMonths : quantity;
+    const total = unitPrice * multiplier;
     const isDiscounted = unitPrice < basePrice;
 
     return { unitPrice, total, isDiscounted, basePrice };
-  }, [selectedProductData, quantity]);
+  }, [selectedProductData, quantity, ispMonths, isIspProduct]);
 
-  const handleGenerate = useCallback(async () => {
+  // Derived ISP options from stock
+  const filteredStock = useMemo(() => {
+    if (!ispStockData?.data || !selectedProductData) return null;
+
+    // Check both residential and datacenter as some versions/plans move ISP between them
+    const resi = ispStockData.data.residential || {};
+    const dc = ispStockData.data.datacenter || {};
+
+    let base: any = {};
+    if (productType === "isp_virgin") {
+      base = resi.virgin?.dedicated || dc.virgin?.dedicated || {};
+    } else {
+      const sharedType = productType === "isp_shared" ? "shared" : "dedicated";
+      base = resi.nonvirgin?.[sharedType] || dc.nonvirgin?.[sharedType] || {};
+    }
+
+    return base;
+  }, [ispStockData, selectedProductData, productType]);
+
+  const ispCountries = useMemo(() => Object.keys(filteredStock || {}), [filteredStock]);
+  const ispNames = useMemo(() => Object.keys(filteredStock?.[ispCountry] || {}), [filteredStock, ispCountry]);
+  const ispCities = useMemo(() => Object.keys(filteredStock?.[ispCountry]?.[ispName] || {}), [filteredStock, ispCountry, ispName]);
+  const currentStockInfo = filteredStock?.[ispCountry]?.[ispName]?.[ispCity];
+
+  const handleOrder = useCallback(async () => {
     setError(null);
     if (!product) {
       setError("Please select a product.");
@@ -133,25 +166,40 @@ export default function Proxies() {
 
     setLoading(true);
     try {
-      const result = await generateProxy.mutateAsync({
-        product_id: Number(product),
-        quantity,
-        country: country || undefined,
-        session_type: sessionType as any,
-      });
-
-      setProxies(result.proxies || []);
-      toast({ title: "Proxies Generated", description: `${result.proxies?.length || 0} proxies ready.` });
+      if (isIspProduct) {
+        if (!ispCountry || !ispName || !ispCity) {
+          throw new Error("Please complete the location settings for static IPs.");
+        }
+        const result = await orderIsp.mutateAsync({
+          product_id: Number(product),
+          quantity,
+          country_code: ispCountry,
+          city: ispCity,
+          isp: ispName,
+          months: ispMonths,
+        });
+        toast({ title: "Order Successful", description: `ISP Package created. Your IPs will appear in your Active Proxies list.` });
+        // Optionally redirect or show success state
+      } else {
+        const result = await generateProxy.mutateAsync({
+          product_id: Number(product),
+          quantity,
+          country: country || undefined,
+          session_type: sessionType as any,
+        });
+        setProxies(result.proxies || []);
+        toast({ title: "Proxies Generated", description: `${result.proxies?.length || 0} proxies ready.` });
+      }
     } catch (err: any) {
       if (err.status === 402) {
         setError("Insufficient balance. Please top up your wallet to continue.");
       } else {
-        setError(err.message || "Failed to generate proxies.");
+        setError(err.message || "Failed to process request.");
       }
     } finally {
       setLoading(false);
     }
-  }, [product, quantity, country, sessionType, generateProxy]);
+  }, [product, quantity, country, sessionType, generateProxy, isIspProduct, ispCountry, ispName, ispCity, ispMonths, orderIsp]);
 
 
 
@@ -215,7 +263,9 @@ export default function Proxies() {
                   onValueChange={(val) => {
                     setProduct(val);
                     const sel = (products ?? []).find((p: any) => p.id.toString() === val);
-                    if (sel) setProductType(sel.type);
+                    if (sel) {
+                      setProductType(sel.type);
+                    }
                   }}
                 >
                   <SelectTrigger><SelectValue placeholder="Select Product..." /></SelectTrigger>
@@ -227,33 +277,68 @@ export default function Proxies() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label>Country</Label>
-                <Select value={country} onValueChange={setCountry}>
-                  <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                  <SelectContent>
-                    {(() => {
-                      const typeToUse = productType === "residential" ? "rp" : productType === "datacenter" ? "dc" : productType === "mobile" ? "mp" : productType;
-                      const countriesObj = (evomiCountries as Record<string, Record<string, string>>)[typeToUse] || {};
-                      return Object.entries(countriesObj).map(([code, name]) => (
-                        <SelectItem key={code} value={code}>{name as string}</SelectItem>
-                      ));
-                    })()}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isIspProduct ? (
+                <>
+                  <div className="space-y-2">
+                    <Label>Country</Label>
+                    <Select value={country} onValueChange={setCountry}>
+                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>
+                        {(() => {
+                          const typeToUse = productType === "residential" ? "rp" : productType === "datacenter" ? "dc" : productType === "mobile" ? "mp" : productType;
+                          const countriesObj = (evomiCountries as Record<string, Record<string, string>>)[typeToUse] || {};
+                          return Object.entries(countriesObj).map(([code, name]) => (
+                            <SelectItem key={code} value={code}>{name as string}</SelectItem>
+                          ));
+                        })()}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
+                  <div className="space-y-2">
+                    <Label>Session Type</Label>
+                    <Select value={sessionType} onValueChange={setSessionType}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="rotating">Rotating</SelectItem>
+                        <SelectItem value="sticky">Sticky</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label>Country</Label>
+                    <Select value={ispCountry} onValueChange={(v) => { setIspCountry(v); setIspName(""); setIspCity(""); }}>
+                      <SelectTrigger><SelectValue placeholder={isLoadingIspStock ? "Loading..." : "Select..."} /></SelectTrigger>
+                      <SelectContent>
+                        {ispCountries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="space-y-2">
-                <Label>Session Type</Label>
-                <Select value={sessionType} onValueChange={setSessionType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="rotating">Rotating</SelectItem>
-                    <SelectItem value="sticky">Sticky</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  <div className="space-y-2">
+                    <Label>ISP</Label>
+                    <Select value={ispName} onValueChange={(v) => { setIspName(v); setIspCity(""); }} disabled={!ispCountry}>
+                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>
+                        {ispNames.map(i => <SelectItem key={i} value={i}>{i.charAt(0).toUpperCase() + i.slice(1)}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>City</Label>
+                    <Select value={ispCity} onValueChange={setIspCity} disabled={!ispName}>
+                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>
+                        {ispCities.map(c => <SelectItem key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
 
               <div className="space-y-2">
                 <Label>Quantity</Label>
@@ -265,18 +350,39 @@ export default function Proxies() {
                   onChange={(e) => setQuantity(Number(e.target.value))}
                 />
               </div>
+
+              {isIspProduct && (
+                <div className="space-y-2">
+                  <Label>Duration (Months)</Label>
+                  <Select value={ispMonths.toString()} onValueChange={(v) => setIspMonths(Number(v))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 Month</SelectItem>
+                      <SelectItem value="3">3 Months</SelectItem>
+                      <SelectItem value="6">6 Months</SelectItem>
+                      <SelectItem value="12">12 Months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             {liveCostInfo && (
               <div className="flex items-center justify-between bg-muted/50 p-4 rounded-md border border-border/50">
                 <div>
-                  <p className="text-sm font-medium">Estimated Cost</p>
+                  <p className="text-sm font-medium">{isIspProduct ? "Total Package Cost" : "Estimated Cost"}</p>
                   <p className="text-xs text-muted-foreground">
-                    {quantity} {productType === "isp" ? "IPs" : productType === "dc_unmetered" ? "Months" : "GB"} @ {format(liveCostInfo.unitPrice)}/ea
+                    {quantity} {isIspProduct ? "IPs" : productType === "dc_unmetered" ? "Months" : "GB"}
+                    {isIspProduct && ` x ${ispMonths} mo`} @ {format(liveCostInfo.unitPrice)}/ea
                     {liveCostInfo.isDiscounted && (
                       <span className="line-through text-muted-foreground/50 ml-2">{format(liveCostInfo.basePrice)}</span>
                     )}
                   </p>
+                  {isIspProduct && currentStockInfo && (
+                    <p className="text-[10px] text-green-600 font-medium mt-1">
+                      In Stock: {currentStockInfo.stock} IPs
+                    </p>
+                  )}
                 </div>
                 <div className="text-right flex flex-col items-end">
                   <p className="text-lg font-bold text-primary">{format(liveCostInfo.total)}</p>
@@ -290,9 +396,9 @@ export default function Proxies() {
             )}
 
             <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={handleGenerate} disabled={loading}>
+              <Button onClick={handleOrder} disabled={loading || (isIspProduct && !currentStockInfo)}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {loading ? t("common.loading") : "Generate"}
+                {loading ? t("common.loading") : isIspProduct ? "Order Static IPs" : "Generate"}
               </Button>
 
               {error && (error.toLowerCase().includes("insufficient balance") || error.toLowerCase().includes("low balance")) && (

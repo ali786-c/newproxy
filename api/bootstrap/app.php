@@ -26,6 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
         $schedule->command('blog:generate-ai')->dailyAt('09:00');
         $schedule->command('proxies:cleanup')->hourly();
+        $schedule->command('proxies:refresh-stock')->everyThirtyMinutes();
+        $schedule->command('isp:deprovision-expired')->hourly();
         $schedule->command('referral:process-pending')->daily();
     })
     ->withExceptions(function (Exceptions $exceptions): void {

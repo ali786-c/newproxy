@@ -4,7 +4,6 @@ import { FAQSection } from "@/components/seo/FAQSection";
 import { InternalLinks } from "@/components/seo/InternalLinks";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Button } from "@/components/ui/button";
 import { Check, Globe, Server, Wifi, Monitor, Shield, Zap } from "lucide-react";
 import { useI18n } from "@/contexts/I18nContext";
 
@@ -16,6 +15,9 @@ const PRODUCT_UI_METADATA: Record<string, any> = {
   mp: { id: "mobile", desc: "Real 3G/4G/5G mobile device connections", unit: "/GB", icon: Monitor, color: "bg-purple-50 text-purple-500 dark:bg-purple-500/10", link: "/signup", tab: "mobile" },
   dc_ipv6: { id: "datacenter-ipv6", desc: "Future-proof high performance IPs", unit: "/GB", icon: Server, color: "bg-green-50 text-green-600 dark:bg-green-500/10", link: "/signup", tab: "datacenter-ipv6" },
   dc_unmetered: { id: "datacenter-unmetered", desc: "Unlimited bandwidth scraping IPs", unit: "/Month", icon: Zap, color: "bg-orange-50 text-orange-500 dark:bg-orange-500/10", link: "/signup", tab: "datacenter-unmetered" },
+  isp_shared: { id: "isp-shared", desc: "Shared static residential IPs", unit: "/IP/Month", icon: Wifi, color: "bg-cyan-50 text-cyan-500 dark:bg-cyan-500/10", link: "/signup", tab: "isp-shared" },
+  isp_private: { id: "isp-private", desc: "Private dedicated static IPs", unit: "/IP/Month", icon: Shield, color: "bg-indigo-50 text-indigo-500 dark:bg-indigo-500/10", link: "/signup", tab: "isp-private" },
+  isp_virgin: { id: "isp-virgin", desc: "Virgin IPs with 0 fraud score", unit: "/IP/Month", icon: Zap, color: "bg-amber-50 text-amber-500 dark:bg-amber-500/10", link: "/signup", tab: "isp-virgin" },
 };
 
 

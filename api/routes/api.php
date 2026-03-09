@@ -50,6 +50,8 @@ Route::middleware(['auth:sanctum', 'banned'])->group(function () {
     Route::post('/proxies/generate', [\App\Http\Controllers\ProxyController::class, 'generate']);
     Route::get('/proxies',           [\App\Http\Controllers\ProxyController::class, 'list']);
     Route::get('/proxies/settings',  [\App\Http\Controllers\ProxyController::class, 'settings']);
+    Route::get('/proxies/isp-stock', [\App\Http\Controllers\ProxyController::class, 'ispStock']);
+    Route::post('/proxies/isp-order', [\App\Http\Controllers\ProxyController::class, 'orderIsp']);
 
     // Subuser Routes
     Route::post('/subusers/setup',  [\App\Http\Controllers\SubuserController::class, 'setup']);

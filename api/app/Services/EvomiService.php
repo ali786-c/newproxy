@@ -384,4 +384,62 @@ class EvomiService
         Log::error('ensureOrderSubuser: failed to create subuser for order', ['order_id' => $order->id, 'result' => $result]);
         return ['success' => false, 'error' => 'Failed to initialize proxy batch with provider.'];
     }
+
+    /**
+     * Fetch available ISP proxy stock for a subuser.
+     */
+    public function getIspStock(string $username)
+    {
+        try {
+            $response = $this->http()->get("{$this->baseUrl}/reseller/sub_users/isp/stock", [
+                'username' => $username,
+            ]);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            Log::error('Evomi API Fail: Fetch ISP Stock', [
+                'username' => $username,
+                'status'   => $response->status(),
+                'body'     => $response->body(),
+            ]);
+            return false;
+        } catch (\Exception $e) {
+            Log::error('Evomi API Exception (GetIspStock): ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Order an ISP proxy package for a subuser.
+     * Params: months, countryCode, city, isp, ips, sharedType, virgin, highConcurrency
+     */
+    public function orderIspPackage(string $username, array $params)
+    {
+        try {
+            $payload = array_merge(['username' => $username], $params);
+            $response = $this->http()->post("{$this->baseUrl}/reseller/sub_users/isp/order", $payload);
+
+            Log::info('Evomi OrderIspPackage', [
+                'username' => $username,
+                'params'   => $params,
+                'status'   => $response->status(),
+                'body'     => $response->body(),
+            ]);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            Log::error('Evomi API Fail: Order ISP Package', [
+                'status' => $response->status(),
+                'body'   => $response->body(),
+            ]);
+            return false;
+        } catch (\Exception $e) {
+            Log::error('Evomi API Exception (OrderIspPackage): ' . $e->getMessage());
+            return false;
+        }
+    }
 }

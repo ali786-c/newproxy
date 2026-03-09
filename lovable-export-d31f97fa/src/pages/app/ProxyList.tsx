@@ -38,6 +38,9 @@ const TYPE_LABELS: Record<string, string> = {
     "mobile": "Mobile Proxies",
     "datacenter-ipv6": "Datacenter IPv6",
     "datacenter-unmetered": "Datacenter Unmetered",
+    "isp-shared": "Shared Static Residential",
+    "isp-private": "Private Static Residential",
+    "isp-virgin": "Virgin Static Residential",
 };
 
 const DB_TYPE_MAP: Record<string, string> = {
@@ -46,6 +49,9 @@ const DB_TYPE_MAP: Record<string, string> = {
     "datacenter": "dc",
     "datacenter-ipv6": "dc_ipv6",
     "datacenter-unmetered": "dc_unmetered",
+    "isp-shared": "isp_shared",
+    "isp-private": "isp_private",
+    "isp-virgin": "isp_virgin",
 };
 
 export default function ProxyList() {
@@ -194,13 +200,17 @@ export default function ProxyList() {
                                                     {p.username}:{p.password}
                                                 </TableCell>
                                                 <TableCell className="min-w-[120px]">
-                                                    <div className="space-y-1">
-                                                        <div className="flex justify-between text-[10px] font-medium">
-                                                            <span>{p.bandwidth_used >= 1024 ? (p.bandwidth_used / 1024).toFixed(2) + ' GB' : Math.round(p.bandwidth_used) + ' MB'}</span>
-                                                            <span className="text-muted-foreground">{p.bandwidth_total >= 1024 ? (p.bandwidth_total / 1024).toFixed(2) + ' GB' : Math.round(p.bandwidth_total) + ' MB'}</span>
+                                                    {p.product_name.toLowerCase().includes('static') || p.product_name.toLowerCase().includes('isp') ? (
+                                                        <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Unlimited</span>
+                                                    ) : (
+                                                        <div className="space-y-1">
+                                                            <div className="flex justify-between text-[10px] font-medium">
+                                                                <span>{p.bandwidth_used >= 1024 ? (p.bandwidth_used / 1024).toFixed(2) + ' GB' : Math.round(p.bandwidth_used) + ' MB'}</span>
+                                                                <span className="text-muted-foreground">{p.bandwidth_total >= 1024 ? (p.bandwidth_total / 1024).toFixed(2) + ' GB' : Math.round(p.bandwidth_total) + ' MB'}</span>
+                                                            </div>
+                                                            <Progress value={Math.min(100, (p.bandwidth_used / (p.bandwidth_total || 1)) * 100)} className="h-1" />
                                                         </div>
-                                                        <Progress value={Math.min(100, (p.bandwidth_used / (p.bandwidth_total || 1)) * 100)} className="h-1" />
-                                                    </div>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant="outline" className="text-[10px] font-normal">
@@ -244,11 +254,17 @@ export default function ProxyList() {
                                             {p.host}:{p.port}
                                         </div>
                                         <div className="space-y-1.5 pt-1">
-                                            <div className="flex justify-between text-[10px] font-medium">
-                                                <span>Used: {p.bandwidth_used >= 1024 ? (p.bandwidth_used / 1024).toFixed(2) + ' GB' : Math.round(p.bandwidth_used) + ' MB'}</span>
-                                                <span className="text-muted-foreground">Limit: {p.bandwidth_total >= 1024 ? (p.bandwidth_total / 1024).toFixed(2) + ' GB' : Math.round(p.bandwidth_total) + ' MB'}</span>
-                                            </div>
-                                            <Progress value={Math.min(100, (p.bandwidth_used / (p.bandwidth_total || 1)) * 100)} className="h-1" />
+                                            {p.product_name.toLowerCase().includes('static') || p.product_name.toLowerCase().includes('isp') ? (
+                                                <Badge variant="outline" className="w-full justify-center border-green-200 text-green-600 bg-green-50/50">Unlimited Bandwidth</Badge>
+                                            ) : (
+                                                <>
+                                                    <div className="flex justify-between text-[10px] font-medium">
+                                                        <span>Used: {p.bandwidth_used >= 1024 ? (p.bandwidth_used / 1024).toFixed(2) + ' GB' : Math.round(p.bandwidth_used) + ' MB'}</span>
+                                                        <span className="text-muted-foreground">Limit: {p.bandwidth_total >= 1024 ? (p.bandwidth_total / 1024).toFixed(2) + ' GB' : Math.round(p.bandwidth_total) + ' MB'}</span>
+                                                    </div>
+                                                    <Progress value={Math.min(100, (p.bandwidth_used / (p.bandwidth_total || 1)) * 100)} className="h-1" />
+                                                </>
+                                            )}
                                         </div>
                                         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                                             <span>Expires: {new Date(p.expires_at).toLocaleDateString()}</span>

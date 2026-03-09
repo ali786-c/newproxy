@@ -258,6 +258,9 @@ export function SidebarNav() {
         { title: t("nav.products.mobile") || "Mobile", url: "/app/proxies/mobile", icon: Smartphone },
         { title: "Datacenter IPv6", url: "/app/proxies/datacenter-ipv6", icon: Server },
         { title: "Datacenter (Unmetered)", url: "/app/proxies/datacenter-unmetered", icon: Server },
+        { title: t("nav.products.ispShared") || "Shared Static", url: "/app/proxies/isp-shared", icon: Home, badge: "ISP" },
+        { title: t("nav.products.ispPrivate") || "Private Static", url: "/app/proxies/isp-private", icon: Home },
+        { title: t("nav.products.ispVirgin") || "Virgin Static", url: "/app/proxies/isp-virgin", icon: Home },
       ],
     },
     /* {

@@ -205,6 +205,38 @@ export function useGenerateProxy() {
   });
 }
 
+export function useIspStock() {
+  return useQuery({
+    queryKey: ["isp-stock"],
+    queryFn: async () => {
+      return api.get("/proxies/isp-stock", z.any());
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+}
+
+export function useOrderIsp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      product_id: number;
+      quantity: number;
+      country_code: string;
+      city: string;
+      isp: string;
+      months: number;
+      high_concurrency?: boolean;
+    }) => {
+      return api.post("/proxies/isp-order", z.any(), params);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
 // ── Subuser Hooks ─────────────────────────────
 
 export function useSubuserStatus() {

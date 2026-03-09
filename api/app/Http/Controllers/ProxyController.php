@@ -261,21 +261,156 @@ class ProxyController extends Controller
         return response()->json($orders);
     }
 
-    /**
-     * Get dynamic proxy settings (countries, cities, etc.)
-     */
     public function settings()
     {
         $cacheKey = 'evomi_proxy_settings';
+        // Pull from cache (refreshed by Cron every 30m)
+        $settings = \Illuminate\Support\Facades\Cache::get($cacheKey);
 
-        $settings = \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () {
-            return $this->evomi->getProxySettings();
-        });
+        if (!$settings) {
+            // Fallback if cache empty
+            $settings = $this->evomi->getProxySettings();
+            if ($settings && !isset($settings['error'])) {
+                \Illuminate\Support\Facades\Cache::put($cacheKey, $settings, 3600);
+            }
+        }
 
         if (!$settings || isset($settings['error'])) {
-            return response()->json(['message' => 'Could not fetch settings from provider.', 'detail' => $settings], 502);
+            return response()->json(['message' => 'Could not fetch settings.', 'detail' => $settings], 502);
         }
 
         return response()->json($settings);
+    }
+
+    public function ispStock(Request $request)
+    {
+        $cacheKey = 'evomi_isp_stock_global';
+        $stock = \Illuminate\Support\Facades\Cache::get($cacheKey);
+
+        if (!$stock) {
+            $user = $request->user();
+            if (!$user->evomi_username) $this->evomi->ensureSubuser($user);
+            $stock = $this->evomi->getIspStock($user->evomi_username);
+            if ($stock) \Illuminate\Support\Facades\Cache::put($cacheKey, $stock, 3600);
+        }
+
+        return response()->json($stock);
+    }
+
+    /**
+     * Order Static ISP proxies.
+     */
+    public function orderIsp(Request $request)
+    {
+        $request->validate([
+            'product_id'      => 'required|exists:products,id',
+            'quantity'        => 'required|integer|min:1|max:1000',
+            'country_code'    => 'required|string|size:2',
+            'city'            => 'required|string',
+            'isp'             => 'required|string',
+            'months'          => 'required|integer|min:1|max:12',
+            'high_concurrency' => 'boolean',
+        ]);
+
+        $user    = $request->user()->fresh();
+        $product = Product::findOrFail($request->product_id);
+
+        if (!in_array($product->type, ['isp_shared', 'isp_private', 'isp_virgin'])) {
+            return response()->json(['message' => 'Invalid product type for ISP order.'], 400);
+        }
+
+        // Calculate cost (Quantity * Months * Price)
+        $totalCost = $request->quantity * $request->months * (float)$product->price;
+
+        if ($user->balance < $totalCost) {
+            return response()->json(['message' => 'Insufficient balance.'], 402);
+        }
+
+        try {
+            // Determine Evomi params based on product type
+            $params = [
+                'months'          => $request->months,
+                'countryCode'     => $request->country_code,
+                'city'            => $request->city,
+                'isp'             => $request->isp,
+                'ips'             => $request->quantity,
+                'highConcurrency' => $request->high_concurrency ?? true,
+                'sharedType'      => ($product->type === 'isp_shared') ? 'shared' : 'dedicated',
+                'virgin'          => ($product->type === 'isp_virgin'),
+            ];
+
+            // 1. Order from Evomi
+            $evomiResult = $this->evomi->orderIspPackage($user->evomi_username, $params);
+
+            if (!$evomiResult || !isset($evomiResult['data'])) {
+                $errorMsg = $evomiResult['message'] ?? 'Failed to order ISP package from provider.';
+                return response()->json(['message' => $errorMsg, 'detail' => $evomiResult], 503);
+            }
+
+            $packageData = $evomiResult['data'];
+
+            // 2. Transaction & Local Record
+            $data = DB::transaction(function () use ($user, $product, $totalCost, $request, $packageData) {
+                // Deduct Balance
+                $user->balance -= $totalCost;
+                $user->save();
+
+                // Log Transaction
+                WalletTransaction::create([
+                    'user_id'     => $user->id,
+                    'type'        => 'debit',
+                    'amount'      => $totalCost,
+                    'description' => "Order: {$request->quantity}x {$product->name} (Static ISP) for {$request->months} month(s)",
+                ]);
+
+                // Create common Order record
+                $order = \App\Models\Order::create([
+                    'user_id'         => $user->id,
+                    'product_id'      => $product->id,
+                    'status'          => 'active',
+                    'bandwidth_total' => 0, // Static IPs have unlimited bandwidth
+                    'bandwidth_used'  => 0,
+                    'expires_at'      => now()->addMonths($request->months),
+                    'evomi_username'  => $user->evomi_username,
+                ]);
+
+                // Create ISP Package record for lifecycle tracking
+                $ispPkg = \App\Models\IspPackage::create([
+                    'user_id'          => $user->id,
+                    'product_id'       => $product->id,
+                    'order_id'         => $order->id,
+                    'evomi_package_id' => $packageData['id'] ?? null,
+                    'status'           => 'active',
+                    'expires_at'       => $order->expires_at,
+                    'ip_data'          => $packageData,
+                ]);
+
+                // Create individual Proxy records
+                if (isset($packageData['ips']) && is_array($packageData['ips'])) {
+                    foreach ($packageData['ips'] as $ipInfo) {
+                        \App\Models\Proxy::create([
+                            'order_id' => $order->id,
+                            'host'     => $ipInfo['ip'] ?? 'isp.evomi.com',
+                            'port'     => $ipInfo['port'] ?? 3000,
+                            'username' => $ipInfo['username'] ?? $user->evomi_username,
+                            'password' => $ipInfo['password'] ?? '',
+                            'country'  => $request->country_code,
+                        ]);
+                    }
+                }
+
+                return $order->load('proxies');
+            });
+
+            return response()->json([
+                'message' => 'ISP Proxies ordered successfully.',
+                'order' => $data,
+                'balance' => $user->fresh()->balance
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('ProxyController OrderIsp Error: ' . $e->getMessage());
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
     }
 }

@@ -30,6 +30,9 @@ type TranslationKeys = {
   "nav.alerts": string;
   "nav.products.datacenter": string;
   "nav.products.mobile": string;
+  "nav.products.ispShared": string;
+  "nav.products.ispPrivate": string;
+  "nav.products.ispVirgin": string;
   "proxies.generate": string;
   // Common
   "common.save": string;
@@ -288,6 +291,10 @@ const en: TranslationKeys = {
   "nav.alerts": "Alerts",
   "nav.products.datacenter": "Datacenter Proxies",
   "nav.products.mobile": "Mobile Proxies",
+  "nav.products.ispShared": "Shared Static",
+  "nav.products.ispPrivate": "Private Static",
+  "nav.products.ispVirgin": "Virgin Static",
+  "proxies.generate": "Generate Proxies",
   "common.save": "Save",
   "common.cancel": "Cancel",
   "common.delete": "Delete",
