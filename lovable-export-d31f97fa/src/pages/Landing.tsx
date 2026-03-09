@@ -145,6 +145,9 @@ const PRODUCT_STYLE_MAP: Record<string, { icon: any, gradient: string, link: str
   rp: { icon: Globe, gradient: "from-blue-500 to-indigo-600", link: "/residential-proxies" },
   mp: { icon: Smartphone, gradient: "from-purple-500 to-pink-500", link: "/mobile-proxies" },
   dc: { icon: Server, gradient: "from-green-500 to-emerald-600", link: "/datacenter-proxies" },
+  isp_shared: { icon: Wifi, gradient: "from-cyan-500 to-blue-400", link: "/isp-proxies" },
+  isp_private: { icon: Shield, gradient: "from-indigo-600 to-purple-500", link: "/isp-proxies" },
+  isp_virgin: { icon: Zap, gradient: "from-amber-400 to-orange-500", link: "/isp-proxies" },
   isp: { icon: Wifi, gradient: "from-orange-500 to-amber-500", link: "/isp-proxies" },
 };
 
@@ -159,6 +162,7 @@ export default function Landing() {
       name: p.name,
       price: `€${p.price}`,
       unit: `/${p.unit || 'GB'}`,
+      is_isp: p.type?.startsWith('isp_'),
       icon: style.icon,
       gradient: style.gradient,
       link: style.link,
@@ -386,7 +390,7 @@ export default function Landing() {
                   <div className="text-right">
                     <span className="text-sm text-white/60">{t("section.from")} </span>
                     <span className="text-xl font-bold text-white">{p.price}</span>
-                    <span className="text-sm text-white/60">{p.unit}</span>
+                    <span className="text-sm text-white/60">{p.is_isp ? p.unit : p.unit}</span>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Button asChild size="sm" variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">

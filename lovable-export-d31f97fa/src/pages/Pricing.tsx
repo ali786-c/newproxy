@@ -62,7 +62,8 @@ export default function Pricing() {
       ...meta,
       db_id: p.id,
       name: p.name,
-      price: `€${(p.price_cents / 100).toFixed(2)}`,
+      price: `€${Number(p.price).toFixed(2)}`,
+      unit: p.unit ? `/${p.unit}` : meta.unit,
       desc: p.tagline || meta.desc,
       features: p.features || []
     };
