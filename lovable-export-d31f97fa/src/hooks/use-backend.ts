@@ -632,6 +632,7 @@ export function use2FARecoveryCodes(enabled: boolean = false) {
 
 export function useNotifications() {
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
 
   const query = useQuery({
     queryKey: ["notifications"],
@@ -639,6 +640,7 @@ export function useNotifications() {
       return api.get("/notifications", z.array(z.any()));
     },
     refetchInterval: 1000 * 60, // Poll every 1 min
+    enabled: isAuthenticated,
   });
 
   const markRead = useMutation({
