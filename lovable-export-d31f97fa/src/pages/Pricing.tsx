@@ -48,22 +48,16 @@ export default function Pricing() {
   const { data: backendProducts } = useProducts();
 
   const products = (backendProducts || []).map((p: any) => {
-    const meta = PRODUCT_UI_METADATA[p.type] || {
-      id: "datacenter",
-      icon: Server,
-      unit: "/GB",
-      desc: "Professional Proxy Solutions",
-      color: "bg-blue-50 text-blue-500 dark:bg-blue-500/10",
-      link: "/signup",
-      tab: "datacenter"
-    };
+    const type = p.type?.toLowerCase() || "";
+    const meta = PRODUCT_UI_METADATA[type] || PRODUCT_UI_METADATA.dc;
+    const isIsp = type.startsWith("isp");
 
     return {
       ...meta,
       db_id: p.id,
       name: p.name,
       price: `€${Number(p.price).toFixed(2)}`,
-      unit: p.unit ? `/${p.unit}` : meta.unit,
+      unit: p.unit ? `/${p.unit}` : (isIsp ? "/IP" : meta.unit),
       desc: p.tagline || meta.desc,
       features: p.features || []
     };

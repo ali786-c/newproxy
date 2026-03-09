@@ -157,12 +157,15 @@ export default function Landing() {
 
   // Combine DB data with UI styles
   const activeProducts = dbProducts.map(p => {
-    const style = PRODUCT_STYLE_MAP[p.type] || { icon: Globe, gradient: "from-slate-500 to-slate-700", link: "/signup" };
+    const type = p.type?.toLowerCase() || "";
+    const style = PRODUCT_STYLE_MAP[type] || PRODUCT_STYLE_MAP.rp;
+    const isIsp = type.startsWith("isp");
+
     return {
       name: p.name,
       price: `€${p.price}`,
-      unit: `/${p.unit || 'GB'}`,
-      is_isp: p.type?.startsWith('isp_'),
+      unit: p.unit ? `/${p.unit}` : (isIsp ? "/IP" : "/GB"),
+      is_isp: isIsp,
       icon: style.icon,
       gradient: style.gradient,
       link: style.link,
