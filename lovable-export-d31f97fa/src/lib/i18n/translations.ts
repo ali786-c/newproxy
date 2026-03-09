@@ -99,6 +99,7 @@ type TranslationKeys = {
   "pub.pricing": string;
   "pub.docs": string;
   "pub.blog": string;
+  "pub.useCases": string;
   "pub.login": string;
   // Hero
   "hero.badge": string;
@@ -348,6 +349,7 @@ const en: TranslationKeys = {
   "pub.pricing": "Pricing",
   "pub.docs": "Docs",
   "pub.blog": "Blog",
+  "pub.useCases": "Use Cases",
   "pub.login": "Login",
   // Hero
   "hero.badge": "Now with TLS Fingerprint Masking",
