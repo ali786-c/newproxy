@@ -23,6 +23,7 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const Docs = lazy(() => import("./pages/Docs"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
+const About = lazy(() => import("./pages/About"));
 
 // Money pages
 const ResidentialProxies = lazy(() => import("./pages/ResidentialProxies"));
@@ -145,6 +146,7 @@ function App() {
                               <Route path="/terms" element={<Terms />} />
                               <Route path="/cookies" element={<CookiePolicy />} />
                               <Route path="/ethics" element={<Ethics />} />
+                              <Route path="/about" element={<About />} />
                               <Route path="/status" element={<Status />} />
                             </Route>
 

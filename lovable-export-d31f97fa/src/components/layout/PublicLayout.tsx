@@ -24,7 +24,7 @@ const FOOTER_PRODUCTS = [
 ];
 
 const FOOTER_EXPLORE_KEYS = [
-  { label: "About Us", to: "/ethics" },
+  { label: "About Us", to: "/about" },
   { label: "Ethics", to: "/ethics" },
   { label: "Blog", to: "/blog" },
   { label: "Docs", to: "/docs" },
