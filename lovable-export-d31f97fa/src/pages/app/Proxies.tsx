@@ -310,30 +310,48 @@ export default function Proxies() {
                 <>
                   <div className="space-y-2">
                     <Label>Country</Label>
-                    <Select value={ispCountry} onValueChange={(v) => { setIspCountry(v); setIspName(""); setIspCity(""); }}>
-                      <SelectTrigger><SelectValue placeholder={isLoadingIspStock ? "Loading..." : "Select..."} /></SelectTrigger>
+                    <Select value={ispCountry} onValueChange={(v) => { setIspCountry(v); setIspName(""); setIspCity(""); }} disabled={ispCountries.length === 0}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoadingIspStock ? "Loading..." : (ispCountries.length === 0 ? "Out of Stock" : "Select...")} />
+                      </SelectTrigger>
                       <SelectContent>
-                        {ispCountries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        {ispCountries.length === 0 ? (
+                          <SelectItem value="out_of_stock" disabled>Out of Stock</SelectItem>
+                        ) : (
+                          ispCountries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
                     <Label>ISP</Label>
-                    <Select value={ispName} onValueChange={(v) => { setIspName(v); setIspCity(""); }} disabled={!ispCountry}>
-                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <Select value={ispName} onValueChange={(v) => { setIspName(v); setIspCity(""); }} disabled={!ispCountry || ispNames.length === 0}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={(!ispCountry) ? "Select Country First" : (ispNames.length === 0 ? "Out of Stock" : "Select...")} />
+                      </SelectTrigger>
                       <SelectContent>
-                        {ispNames.map(i => <SelectItem key={i} value={i}>{i.charAt(0).toUpperCase() + i.slice(1)}</SelectItem>)}
+                        {ispNames.length === 0 ? (
+                          <SelectItem value="out_of_stock" disabled>Out of Stock</SelectItem>
+                        ) : (
+                          ispNames.map(i => <SelectItem key={i} value={i}>{i.charAt(0).toUpperCase() + i.slice(1)}</SelectItem>)
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
                     <Label>City</Label>
-                    <Select value={ispCity} onValueChange={setIspCity} disabled={!ispName}>
-                      <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <Select value={ispCity} onValueChange={setIspCity} disabled={!ispName || ispCities.length === 0}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={(!ispName) ? "Select ISP First" : (ispCities.length === 0 ? "Out of Stock" : "Select...")} />
+                      </SelectTrigger>
                       <SelectContent>
-                        {ispCities.map(c => <SelectItem key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>)}
+                        {ispCities.length === 0 ? (
+                          <SelectItem value="out_of_stock" disabled>Out of Stock</SelectItem>
+                        ) : (
+                          ispCities.map(c => <SelectItem key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</SelectItem>)
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
