@@ -117,19 +117,19 @@ class ProxyController extends Controller
                     'dc'  => 2000
                 ];
                 $hostMap = [
-                    'rp'  => 'proxy.upgradedproxy.com',
-                    'mp'  => 'proxy.upgradedproxy.com',
-                    'dc'  => 'proxy.upgradedproxy.com',
-                    'dc_ipv6' => 'proxy.upgradedproxy.com',
-                    'dc_unmetered' => 'proxy.upgradedproxy.com',
-                    'isp' => 'proxy.upgradedproxy.com',
-                    'isp_shared' => 'proxy.upgradedproxy.com',
-                    'isp_private' => 'proxy.upgradedproxy.com',
-                    'isp_virgin' => 'proxy.upgradedproxy.com',
+                    'rp'  => 'proxy.upgraderproxy.com',
+                    'mp'  => 'proxy.upgraderproxy.com',
+                    'dc'  => 'proxy.upgraderproxy.com',
+                    'dc_ipv6' => 'proxy.upgraderproxy.com',
+                    'dc_unmetered' => 'proxy.upgraderproxy.com',
+                    'isp' => 'proxy.upgraderproxy.com',
+                    'isp_shared' => 'proxy.upgraderproxy.com',
+                    'isp_private' => 'proxy.upgraderproxy.com',
+                    'isp_virgin' => 'proxy.upgraderproxy.com',
                 ];
 
                 $port    = $portMap[$product->type] ?? 1000;
-                $host    = $hostMap[$product->type] ?? 'proxy.upgradedproxy.com';
+                $host    = $hostMap[$product->type] ?? 'proxy.upgraderproxy.com';
 
                 $country     = $request->country      ?? 'US';
                 $sessionType = $request->session_type ?? 'rotating';
