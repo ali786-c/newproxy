@@ -29,17 +29,11 @@ import {
   Eye,
   FileSearch,
   Database,
-  ArrowRight,
-  X as XIcon,
-  Timer,
-  RefreshCw,
-  Layers,
-  Smartphone,
-  Brain,
-  MapPin,
   ShieldCheck as BrandShield,
   Plane,
+  Loader2,
 } from "lucide-react";
+import { useProducts } from "@/hooks/use-backend";
 
 /* ── Data ──────────────────────────────────────────────── */
 
@@ -139,8 +133,38 @@ function NewsletterSection() {
 
 /* ── Component ────────────────────────────────────────── */
 
+const PRODUCT_STYLE_MAP: Record<string, { icon: any, gradient: string, link: string }> = {
+  rp: { icon: Globe, gradient: "from-blue-500 to-indigo-600", link: "/residential-proxies" },
+  mp: { icon: Smartphone, gradient: "from-purple-500 to-pink-500", link: "/mobile-proxies" },
+  dc: { icon: Server, gradient: "from-green-500 to-emerald-600", link: "/datacenter-proxies" },
+  isp: { icon: Wifi, gradient: "from-orange-500 to-amber-500", link: "/isp-proxies" },
+};
+
 export default function Landing() {
   const { t } = useI18n();
+  const { data: dbProducts = [], isLoading: productsLoading } = useProducts();
+
+  // Combine DB data with UI styles
+  const activeProducts = dbProducts.map(p => {
+    const style = PRODUCT_STYLE_MAP[p.type] || { icon: Globe, gradient: "from-slate-500 to-slate-700", link: "/signup" };
+    return {
+      name: p.name,
+      price: `€${p.price}`,
+      unit: `/${p.unit || 'GB'}`,
+      icon: style.icon,
+      gradient: style.gradient,
+      link: style.link,
+      cta: "hero.getStarted"
+    };
+  });
+
+  // Fallback to static if no products or loading
+  const displayProducts = activeProducts.length > 0 ? activeProducts : [
+    { name: "Residential Proxies", price: "€0.99", unit: "/GB", icon: Globe, gradient: "from-blue-500 to-indigo-600", link: "/residential-proxies", cta: "hero.getStarted" },
+    { name: "Mobile Proxies", price: "€2.95", unit: "/GB", icon: Smartphone, gradient: "from-purple-500 to-pink-500", link: "/mobile-proxies", cta: "hero.getStarted" },
+    { name: "Datacenter Proxies", price: "€0.79", unit: "/GB", icon: Server, gradient: "from-green-500 to-emerald-600", link: "/datacenter-proxies", cta: "hero.getStarted" },
+    { name: "Static Residential Proxies", price: "€2.99", unit: "/IP", icon: Wifi, gradient: "from-orange-500 to-amber-500", link: "/isp-proxies", cta: "hero.getStarted" },
+  ];
 
   const FEATURES = [
     { icon: Shield, title: t("feat.enterpriseSecurity"), desc: t("feat.enterpriseSecurityDesc") },
@@ -337,8 +361,13 @@ export default function Landing() {
             </div>
 
             {/* Right column — product cards */}
-            <div className="space-y-3">
-              {PRODUCTS.map((p) => (
+            <div className="space-y-3 relative">
+              {productsLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-transparent z-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              )}
+              {displayProducts.map((p) => (
                 <div key={p.name} className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4 transition-colors hover:border-primary/40">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${p.gradient}`}>
                     <p.icon className="h-6 w-6 text-white" />
