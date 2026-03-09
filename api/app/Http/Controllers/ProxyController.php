@@ -117,14 +117,19 @@ class ProxyController extends Controller
                     'dc'  => 2000
                 ];
                 $hostMap = [
-                    'rp'  => 'rp.evomi.com',
-                    'mp'  => 'mp.evomi.com',
-                    'dc'  => 'dcp.evomi.com',
-                    'isp' => 'isp.evomi.com'
+                    'rp'  => 'proxy.upgradedproxy.com',
+                    'mp'  => 'proxy.upgradedproxy.com',
+                    'dc'  => 'proxy.upgradedproxy.com',
+                    'dc_ipv6' => 'proxy.upgradedproxy.com',
+                    'dc_unmetered' => 'proxy.upgradedproxy.com',
+                    'isp' => 'proxy.upgradedproxy.com',
+                    'isp_shared' => 'proxy.upgradedproxy.com',
+                    'isp_private' => 'proxy.upgradedproxy.com',
+                    'isp_virgin' => 'proxy.upgradedproxy.com',
                 ];
 
                 $port    = $portMap[$product->type] ?? 1000;
-                $host    = $hostMap[$product->type] ?? 'gate.evomi.com';
+                $host    = $hostMap[$product->type] ?? 'proxy.upgradedproxy.com';
 
                 $country     = $request->country      ?? 'US';
                 $sessionType = $request->session_type ?? 'rotating';
