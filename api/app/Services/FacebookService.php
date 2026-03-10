@@ -33,10 +33,25 @@ class FacebookService
 
             $message = $post->title . "\n\n" . $post->excerpt . "\n\n" . "Read more: " . $postUrl;
 
-            $response = Http::withoutVerifying()->post("https://graph.facebook.com/v25.0/{$pageId}/feed", [
-                'message' => $message,
-                'access_token' => $accessToken,
-            ]);
+            // Handle Image vs Text-only post
+            if (!empty($post->image_url)) {
+                $photoUrl = $post->image_url;
+                // Make URL absolute if it's relative
+                if (!str_starts_with($photoUrl, 'http')) {
+                    $photoUrl = rtrim($websiteUrl, '/') . '/' . ltrim($photoUrl, '/');
+                }
+
+                $response = Http::withoutVerifying()->post("https://graph.facebook.com/v25.0/{$pageId}/photos", [
+                    'url'          => $photoUrl,
+                    'caption'      => $message,
+                    'access_token' => $accessToken,
+                ]);
+            } else {
+                $response = Http::withoutVerifying()->post("https://graph.facebook.com/v25.0/{$pageId}/feed", [
+                    'message'      => $message,
+                    'access_token' => $accessToken,
+                ]);
+            }
 
             if ($response->successful()) {
                 Log::info("Facebook: Post successfully shared: {$post->title}");
