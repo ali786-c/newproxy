@@ -33,6 +33,8 @@ import {
   useDeleteAutoBlogKeyword,
   useTriggerAutoBlog,
   useTestTelegram,
+  useTestGoogleIndexing,
+  useSubmitUrlToIndex,
 } from "@/hooks/use-backend";
 
 const STATUS_BADGE: Record<string, "default" | "secondary" | "outline"> = {
@@ -68,6 +70,8 @@ export default function AdminBlog() {
   const deleteKeyword = useDeleteAutoBlogKeyword();
   const triggerAuto = useTriggerAutoBlog();
   const testTelegram = useTestTelegram();
+  const testIndexing = useTestGoogleIndexing();
+  const submitToIndex = useSubmitUrlToIndex();
 
   const [newKeyword, setNewKeyword] = useState("");
   const [newCategory, setNewCategory] = useState("General");
@@ -80,6 +84,11 @@ export default function AdminBlog() {
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramChannel, setTelegramChannel] = useState("");
   const [telegramEnabled, setTelegramEnabled] = useState(false);
+
+  // Google Indexing Local State
+  const [googleIndexingEnabled, setGoogleIndexingEnabled] = useState(false);
+  const [googleJson, setGoogleJson] = useState("");
+  const [googleConfigured, setGoogleConfigured] = useState(false);
 
   // AI Generation Progress State
   const [progressStep, setProgressStep] = useState(0);
@@ -113,8 +122,11 @@ export default function AdminBlog() {
       setTelegramToken(autoBlogData.settings.telegram_bot_token || "");
       setTelegramChannel(autoBlogData.settings.telegram_channel_id || "");
       setTelegramEnabled(autoBlogData.settings.telegram_auto_post_enabled || false);
+
+      setGoogleIndexingEnabled(autoBlogData.settings.google_indexing_enabled || false);
+      setGoogleConfigured(autoBlogData.settings.google_indexing_configured || false);
     }
-  }, [autoBlogData.settings]);
+  }, [autoBlogData]);
 
   const posts = rawPosts.map((p: any) => ({
     ...p,
@@ -187,18 +199,20 @@ export default function AdminBlog() {
     updateAutoSettings.mutate({
       gemini_api_key: localApiKey,
       gemini_model: localModel,
-      telegram_bot_token: telegramToken,
-      telegram_channel_id: telegramChannel,
-      telegram_auto_post_enabled: telegramEnabled
+      telegram_auto_post_enabled: telegramEnabled,
+      google_indexing_enabled: googleIndexingEnabled,
+      google_indexing_json: googleJson,
     }, {
-      onSuccess: () => toast({
-        title: "Settings Saved",
-        description: "Automation configuration updated successfully."
-      })
+      onSuccess: () => {
+        setGoogleJson(""); // Clear for security
+        toast({
+          title: "Settings Saved",
+          description: "Automation configuration updated successfully."
+        });
+      }
     });
   };
 
-  // Add a test telegram function
   const handleTestTelegram = async () => {
     testTelegram.mutate(undefined, {
       onSuccess: (data: any) => {
@@ -210,6 +224,21 @@ export default function AdminBlog() {
       },
       onError: (err: any) => {
         toast({ variant: "destructive", title: "Error", description: err.message || "Could not connect to test API." });
+      }
+    });
+  };
+
+  const handleTestIndexing = async () => {
+    testIndexing.mutate(undefined, {
+      onSuccess: (data: any) => {
+        if (data.ok) {
+          toast({ title: "Indexing Verified!", description: data.message });
+        } else {
+          toast({ variant: "destructive", title: "Indexing Failed", description: data.message || "Unknown error" });
+        }
+      },
+      onError: (err: any) => {
+        toast({ variant: "destructive", title: "Error", description: err.message || "Could not connect to indexing API." });
       }
     });
   };
@@ -292,6 +321,32 @@ export default function AdminBlog() {
                         </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                submitToIndex.mutate(post.id, {
+                                  onSuccess: (data: any) => toast({
+                                    title: "SEO Indexing",
+                                    description: data.message
+                                  }),
+                                  onError: (error: any) => toast({
+                                    variant: "destructive",
+                                    title: "Error",
+                                    description: error?.message || "Failed to submit for indexing"
+                                  })
+                                });
+                              }}
+                              disabled={submitToIndex.isPending || post.is_draft}
+                              className="h-8 w-8 text-blue-500 hover:text-blue-600"
+                              title="Index Now"
+                            >
+                              {submitToIndex.isPending && submitToIndex.variables === post.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Zap className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => openEdit(post)} className="h-8 w-8">
                               <Edit2 className="h-3.5 w-3.5" />
                             </Button>
@@ -338,6 +393,7 @@ export default function AdminBlog() {
                     <TabsList className="w-full">
                       <TabsTrigger value="gemini" className="flex-1">Gemini AI</TabsTrigger>
                       <TabsTrigger value="telegram" className="flex-1">Telegram API</TabsTrigger>
+                      <TabsTrigger value="indexing" className="flex-1">SEO / Indexing</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="gemini" className="space-y-4 mt-4">
@@ -406,6 +462,43 @@ export default function AdminBlog() {
                       </div>
                       <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleTestTelegram}>
                         <Send className="h-3.5 w-3.5" /> Send Test Message
+                      </Button>
+                    </TabsContent>
+
+                    <TabsContent value="indexing" className="space-y-4 mt-4">
+                      <div className="space-y-1.5">
+                        <Label>Google Service Account JSON</Label>
+                        <Textarea
+                          placeholder='{ "type": "service_account", ... }'
+                          value={googleJson}
+                          onChange={(e) => setGoogleJson(e.target.value)}
+                          className="font-mono text-[10px] min-h-[120px]"
+                          autoComplete="off"
+                        />
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Key className="h-3 w-3" />
+                          {googleConfigured ? "JSON Key is stored & encrypted ✅" : "JSON Key not uploaded yet ❌"}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between pt-2">
+                        <div className="space-y-0.5">
+                          <Label>Enable Auto-Indexing</Label>
+                          <p className="text-xs text-muted-foreground">Notify Google on new posts</p>
+                        </div>
+                        <Switch
+                          checked={googleIndexingEnabled}
+                          onCheckedChange={setGoogleIndexingEnabled}
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                        onClick={handleTestIndexing}
+                        disabled={testIndexing.isPending}
+                      >
+                        {testIndexing.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
+                        {testIndexing.isPending ? "Connecting to Google..." : "Test Google Indexing"}
                       </Button>
                     </TabsContent>
                   </Tabs>

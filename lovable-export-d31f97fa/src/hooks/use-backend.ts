@@ -532,6 +532,19 @@ export function useTestTelegram() {
   });
 }
 
+export function useTestGoogleIndexing() {
+  return useMutation({
+    mutationFn: () => api.post("/admin/blog/automation/google-test", z.any()),
+  });
+}
+
+export function useSubmitUrlToIndex() {
+  return useMutation({
+    mutationFn: (postId: number | string) =>
+      api.post("/admin/blog/automation/google-index-post", z.any(), { post_id: postId }),
+  });
+}
+
 // Alert Hooks
 export function useAdminAlertConfig() {
   return useQuery({
