@@ -180,6 +180,8 @@ Route::middleware(['auth:sanctum', 'role:admin', 'throttle:60,1'])->prefix('admi
     Route::post('/blog/automation/google-test', [\App\Http\Controllers\AutoBlogController::class, 'testIndexing']);
     Route::post('/blog/automation/google-index-post', [\App\Http\Controllers\AutoBlogController::class, 'indexPost']);
     Route::post('/blog/automation/telegram-share-post', [\App\Http\Controllers\AutoBlogController::class, 'sharePostToTelegram']);
+    Route::post('/blog/automation/x-test', [\App\Http\Controllers\AutoBlogController::class, 'testX']);
+    Route::post('/blog/automation/x-share-post', [\App\Http\Controllers\AutoBlogController::class, 'sharePostToX']);
     Route::post('/blog/automation/facebook-test', [\App\Http\Controllers\AutoBlogController::class, 'testFacebook']);
     Route::post('/blog/automation/facebook-share-post', [\App\Http\Controllers\AutoBlogController::class, 'sharePostToFacebook']);
 

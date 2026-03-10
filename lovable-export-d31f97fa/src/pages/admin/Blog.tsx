@@ -17,7 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Send, Clock, FileText, Search, Plus, Trash2, Edit2, Loader2, Globe, Mail, Settings, Rss, Eye, Sparkles, Save, Bot, Key, Zap, Facebook
+  Send, Clock, FileText, Search, Plus, Trash2, Edit2, Loader2, Globe, Mail, Settings, Rss, Eye, Sparkles, Save, Bot, Key, Zap, Facebook, Twitter
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
@@ -38,6 +38,8 @@ import {
   useSharePostToTelegram,
   useTestFacebookSharing,
   useSharePostToFacebook,
+  useTestXSharing,
+  useSharePostToX,
 } from "@/hooks/use-backend";
 
 const STATUS_BADGE: Record<string, "default" | "secondary" | "outline"> = {
@@ -78,6 +80,8 @@ export default function AdminBlog() {
   const shareToTelegram = useSharePostToTelegram();
   const testFacebook = useTestFacebookSharing();
   const shareToFacebook = useSharePostToFacebook();
+  const testX = useTestXSharing();
+  const shareToX = useSharePostToX();
 
   const [newKeyword, setNewKeyword] = useState("");
   const [newCategory, setNewCategory] = useState("General");
@@ -96,11 +100,16 @@ export default function AdminBlog() {
   const [googleJson, setGoogleJson] = useState("");
   const [googleConfigured, setGoogleConfigured] = useState(false);
 
-  // Facebook Settings Local State
-  const [facebookPageId, setFacebookPageId] = useState("");
-  const [facebookToken, setFacebookToken] = useState("");
-  const [facebookAutoEnabled, setFacebookAutoEnabled] = useState(false);
   const [facebookConfigured, setFacebookConfigured] = useState(false);
+
+  // X (Twitter) Settings Local State
+  const [xApiKey, setXApiKey] = useState("");
+  const [xApiSecret, setXApiSecret] = useState("");
+  const [xAccessToken, setXAccessToken] = useState("");
+  const [xAccessTokenSecret, setXAccessTokenSecret] = useState("");
+  const [xAutoEnabled, setXAutoEnabled] = useState(false);
+  const [xSecretConfigured, setXSecretConfigured] = useState(false);
+  const [xTokenSecretConfigured, setXTokenSecretConfigured] = useState(false);
 
   // AI Generation Progress State
   const [progressStep, setProgressStep] = useState(0);
@@ -111,7 +120,8 @@ export default function AdminBlog() {
     "Formatting HTML & SEO optimizations...",
     "Saving to database...",
     "Sharing to Telegram channel...",
-    "Posting to Facebook Page..."
+    "Posting to Facebook Page...",
+    "Tweeting to X (Twitter)..."
   ];
 
   useEffect(() => {
@@ -142,6 +152,11 @@ export default function AdminBlog() {
       setFacebookPageId(autoBlogData.settings.facebook_page_id || "");
       setFacebookAutoEnabled(autoBlogData.settings.facebook_auto_post_enabled || false);
       setFacebookConfigured(autoBlogData.settings.facebook_access_token_configured || false);
+
+      setXApiKey(autoBlogData.settings.x_api_key || "");
+      setXAutoEnabled(autoBlogData.settings.x_auto_post_enabled || false);
+      setXSecretConfigured(autoBlogData.settings.x_api_secret_configured || false);
+      setXTokenSecretConfigured(autoBlogData.settings.x_access_token_secret_configured || false);
     }
   }, [autoBlogData]);
 
@@ -237,10 +252,17 @@ export default function AdminBlog() {
       facebook_page_id: facebookPageId,
       facebook_access_token: facebookToken,
       facebook_auto_post_enabled: facebookAutoEnabled,
+      x_api_key: xApiKey,
+      x_api_secret: xApiSecret,
+      x_access_token: xAccessToken,
+      x_access_token_secret: xAccessTokenSecret,
+      x_auto_post_enabled: xAutoEnabled,
     }, {
       onSuccess: () => {
         setGoogleJson(""); // Clear for security
         setFacebookToken(""); // Clear for security
+        setXApiSecret(""); // Clear for security
+        setXAccessTokenSecret(""); // Clear for security
         toast({
           title: "Settings Saved",
           description: "Automation configuration updated successfully."
@@ -435,6 +457,32 @@ export default function AdminBlog() {
                                 <Facebook className="h-3.5 w-3.5" />
                               )}
                             </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                shareToX.mutate(post.id, {
+                                  onSuccess: (data: any) => toast({
+                                    title: "X (Twitter) Share",
+                                    description: data.message
+                                  }),
+                                  onError: (error: any) => toast({
+                                    variant: "destructive",
+                                    title: "Error",
+                                    description: error?.message || "Failed to share to X"
+                                  })
+                                });
+                              }}
+                              disabled={shareToX.isPending || post.is_draft}
+                              className="h-8 w-8 text-sky-500 hover:text-sky-600"
+                              title="Send to X (Twitter)"
+                            >
+                              {shareToX.isPending && shareToX.variables === post.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Twitter className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => openEdit(post)} className="h-8 w-8">
                               <Edit2 className="h-3.5 w-3.5" />
                             </Button>
@@ -483,6 +531,7 @@ export default function AdminBlog() {
                       <TabsTrigger value="telegram" className="text-xs">Telegram</TabsTrigger>
                       <TabsTrigger value="indexing" className="text-xs">Indexing</TabsTrigger>
                       <TabsTrigger value="facebook" className="text-xs">Facebook</TabsTrigger>
+                      <TabsTrigger value="x" className="text-xs">X (Twitter)</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="gemini" className="space-y-4 mt-4">
@@ -639,6 +688,85 @@ export default function AdminBlog() {
                           className="w-full flex items-center justify-center gap-2"
                         >
                           {testFacebook.isPending ? "Testing..." : <><Facebook className="h-4 w-4" /> Test Facebook Post</>}
+                        </Button>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="x" className="space-y-4 pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium">Automatic X (Twitter) Sharing</h4>
+                          <p className="text-xs text-muted-foreground">Tweet every new blog post automatically.</p>
+                        </div>
+                        <Switch
+                          checked={xAutoEnabled}
+                          onCheckedChange={setXAutoEnabled}
+                        />
+                      </div>
+
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label>API Key (Consumer Key)</Label>
+                          <Input
+                            placeholder="Your X API Key"
+                            value={xApiKey}
+                            onChange={(e) => setXApiKey(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>API Secret Key</Label>
+                          <div className="relative">
+                            <Input
+                              type="password"
+                              placeholder={xSecretConfigured ? "••••••••••••••••" : "Paste your API Secret"}
+                              value={xApiSecret}
+                              onChange={(e) => setXApiSecret(e.target.value)}
+                              autoComplete="off"
+                            />
+                            {xSecretConfigured && !xApiSecret && (
+                              <span className="absolute right-3 top-2.5 text-[10px] text-green-500 font-medium">CONFIGURED</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Access Token</Label>
+                          <Input
+                            placeholder="Your X Access Token"
+                            value={xAccessToken}
+                            onChange={(e) => setXAccessToken(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Access Token Secret</Label>
+                          <div className="relative">
+                            <Input
+                              type="password"
+                              placeholder={xTokenSecretConfigured ? "••••••••••••••••" : "Paste your Token Secret"}
+                              value={xAccessTokenSecret}
+                              onChange={(e) => setXAccessTokenSecret(e.target.value)}
+                              autoComplete="off"
+                            />
+                            {xTokenSecretConfigured && !xAccessTokenSecret && (
+                              <span className="absolute right-3 top-2.5 text-[10px] text-green-500 font-medium">CONFIGURED</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            testX.mutate(undefined, {
+                              onSuccess: (data: any) => {
+                                if (data.ok) toast({ title: "X Test Success", description: "Test tweet sent!" });
+                                else toast({ variant: "destructive", title: "X Test Failed", description: data.description });
+                              }
+                            });
+                          }}
+                          disabled={testX.isPending}
+                          className="w-full gap-2"
+                        >
+                          {testX.isPending ? "Testing..." : <><Twitter className="h-4 w-4" /> Test X Tweet</>}
                         </Button>
                       </div>
                     </TabsContent>
@@ -834,7 +962,7 @@ export default function AdminBlog() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </div >
     </>
   );
 }

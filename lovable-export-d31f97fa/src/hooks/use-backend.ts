@@ -565,6 +565,19 @@ export function useSharePostToFacebook() {
   });
 }
 
+export function useTestXSharing() {
+  return useMutation({
+    mutationFn: () => api.post("/admin/blog/automation/x-test", z.any()),
+  });
+}
+
+export function useSharePostToX() {
+  return useMutation({
+    mutationFn: (postId: number | string) =>
+      api.post("/admin/blog/automation/x-share-post", z.any(), { post_id: postId }),
+  });
+}
+
 // Alert Hooks
 export function useAdminAlertConfig() {
   return useQuery({
