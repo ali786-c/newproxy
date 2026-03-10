@@ -12,10 +12,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('email_verification_code', 6)->nullable()->after('email');
-            $table->timestamp('email_verification_expires_at')->nullable()->after('email_verification_code');
-            $table->boolean('has_claimed_trial')->default(false)->after('balance');
-            $table->string('trial_claim_ip')->nullable()->after('has_claimed_trial');
+            if (!Schema::hasColumn('users', 'email_verification_code')) {
+                $table->string('email_verification_code', 6)->nullable()->after('email');
+            }
+            if (!Schema::hasColumn('users', 'email_verification_expires_at')) {
+                $table->timestamp('email_verification_expires_at')->nullable()->after('email_verification_code');
+            }
+            if (!Schema::hasColumn('users', 'has_claimed_trial')) {
+                $table->boolean('has_claimed_trial')->default(false)->after('balance');
+            }
+            if (!Schema::hasColumn('users', 'trial_claim_ip')) {
+                $table->string('trial_claim_ip')->nullable()->after('has_claimed_trial');
+            }
         });
     }
 
