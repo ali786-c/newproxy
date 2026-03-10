@@ -526,6 +526,12 @@ export function useTriggerAutoBlog() {
   });
 }
 
+export function useTestTelegram() {
+  return useMutation({
+    mutationFn: () => api.post("/admin/blog/automation/telegram-test", z.any()),
+  });
+}
+
 // Alert Hooks
 export function useAdminAlertConfig() {
   return useQuery({

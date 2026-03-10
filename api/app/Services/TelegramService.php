@@ -74,15 +74,26 @@ class TelegramService
         $channelId = Setting::getValue('telegram_channel_id');
 
         if (!$token || !$channelId) {
-            return "Missing configuration (Token or Channel ID).";
+            return [
+                'ok' => false,
+                'description' => "Missing configuration (Token or Channel ID)."
+            ];
         }
 
-        $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$token}/sendMessage", [
-            'chat_id' => $channelId,
-            'text'    => $message,
-            'parse_mode' => 'HTML',
-        ]);
+        try {
+            $response = Http::withoutVerifying()->timeout(10)->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                'chat_id' => $channelId,
+                'text'    => $message,
+                'parse_mode' => 'HTML',
+            ]);
 
-        return $response->json();
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error("Telegram Test Exception: " . $e->getMessage());
+            return [
+                'ok' => false,
+                'description' => "Connection Error: " . $e->getMessage()
+            ];
+        }
     }
 }

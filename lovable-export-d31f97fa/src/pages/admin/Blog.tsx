@@ -32,6 +32,7 @@ import {
   useAddAutoBlogKeyword,
   useDeleteAutoBlogKeyword,
   useTriggerAutoBlog,
+  useTestTelegram,
 } from "@/hooks/use-backend";
 
 const STATUS_BADGE: Record<string, "default" | "secondary" | "outline"> = {
@@ -66,6 +67,7 @@ export default function AdminBlog() {
   const addKeyword = useAddAutoBlogKeyword();
   const deleteKeyword = useDeleteAutoBlogKeyword();
   const triggerAuto = useTriggerAutoBlog();
+  const testTelegram = useTestTelegram();
 
   const [newKeyword, setNewKeyword] = useState("");
   const [newCategory, setNewCategory] = useState("General");
@@ -198,23 +200,18 @@ export default function AdminBlog() {
 
   // Add a test telegram function
   const handleTestTelegram = async () => {
-    try {
-      const response = await fetch('/api/admin/blog/automation/telegram-test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // simple assumption
+    testTelegram.mutate(undefined, {
+      onSuccess: (data: any) => {
+        if (data.ok) {
+          toast({ title: "Test Success!", description: "Check your Telegram channel." });
+        } else {
+          toast({ variant: "destructive", title: "Test Failed", description: data.description || "Unknown error" });
         }
-      });
-      const data = await response.json();
-      if (data.ok) {
-        toast({ title: "Test Success!", description: "Check your Telegram channel." });
-      } else {
-        toast({ variant: "destructive", title: "Test Failed", description: data.description || "Unknown error" });
+      },
+      onError: (err: any) => {
+        toast({ variant: "destructive", title: "Error", description: err.message || "Could not connect to test API." });
       }
-    } catch (err) {
-      toast({ variant: "destructive", title: "Error", description: "Could not connect to test API." });
-    }
+    });
   };
 
   return (
