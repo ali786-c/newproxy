@@ -29,7 +29,7 @@ class GenerateAIPost extends Command
     /**
      * Execute the console command.
      */
-    public function handle(GeminiService $gemini, \App\Services\BlogRenderer $renderer)
+    public function handle(GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram)
     {
         Log::info('Cron: Starting Robust AI blog generation...');
 
@@ -83,6 +83,9 @@ class GenerateAIPost extends Command
             ]);
 
             $keywordObj->update(['last_used_at' => now()]);
+
+            // 5. Telegram Share
+            $telegram->sendBlogPost($post);
 
             Log::info("Cron: Success! Blog published: {$post->title}");
             

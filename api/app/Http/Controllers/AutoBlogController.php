@@ -26,6 +26,10 @@ class AutoBlogController extends Controller
                 'gemini_api_key' => $apiKey,
                 'gemini_model'   => Setting::getValue('gemini_model') ?: config('services.gemini.model', 'gemini-2.5-flash'),
                 'auto_posting_enabled' => Setting::getValue('auto_blog_enabled', '0') === '1',
+                // Telegram settings
+                'telegram_bot_token' => Setting::getValue('telegram_bot_token') ?: '',
+                'telegram_channel_id' => Setting::getValue('telegram_channel_id') ?: '',
+                'telegram_auto_post_enabled' => Setting::getValue('telegram_auto_post_enabled', '0') === '1',
             ]
         ]);
     }
@@ -80,6 +84,9 @@ class AutoBlogController extends Controller
             'gemini_api_key' => 'nullable|string',
             'gemini_model'   => 'nullable|string',
             'auto_blog_enabled' => 'nullable|boolean',
+            'telegram_bot_token' => 'nullable|string',
+            'telegram_channel_id' => 'nullable|string',
+            'telegram_auto_post_enabled' => 'nullable|boolean',
         ]);
 
         if ($request->has('gemini_api_key')) {
@@ -94,11 +101,23 @@ class AutoBlogController extends Controller
             \App\Models\Setting::updateOrCreate(['key' => 'auto_blog_enabled'], ['value' => $request->auto_blog_enabled ? '1' : '0']);
         }
 
+        if ($request->has('telegram_bot_token')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'telegram_bot_token'], ['value' => $request->telegram_bot_token]);
+        }
+
+        if ($request->has('telegram_channel_id')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'telegram_channel_id'], ['value' => $request->telegram_channel_id]);
+        }
+
+        if ($request->has('telegram_auto_post_enabled')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'telegram_auto_post_enabled'], ['value' => $request->telegram_auto_post_enabled ? '1' : '0']);
+        }
+
         \App\Models\AdminLog::log(
             'update_autoblog_settings',
-            "Updated Gemini Auto-Blog Settings",
+            "Updated Auto-Blog Settings (including Telegram)",
             null,
-            $request->except('gemini_api_key') // Don't log the API key in plain context
+            $request->except(['gemini_api_key', 'telegram_bot_token']) // Don't log sensitive keys
         );
 
         return response()->json(['message' => 'Settings updated.']);
@@ -107,7 +126,7 @@ class AutoBlogController extends Controller
     /**
      * Admin: Manually trigger a blog post generation.
      */
-    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer)
+    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram)
     {
         $keywordObj = null;
 
@@ -186,16 +205,22 @@ class AutoBlogController extends Controller
 
             $keywordObj->update(['last_used_at' => now()]);
 
+            // 6. Share to Telegram (Background aware service)
+            $telegramShared = $telegram->sendBlogPost($post);
+
             \App\Models\AdminLog::log(
                 'trigger_autoblog',
-                "Generated AI blog with 2K Pro image: '{$post->title}'",
+                "Generated AI blog" . ($telegramShared ? " & Shared to Telegram" : "") . ": '{$post->title}'",
                 null,
-                ['post_id' => $post->id, 'keyword' => $keywordObj->keyword]
+                ['post_id' => $post->id, 'keyword' => $keywordObj->keyword, 'telegram_shared' => $telegramShared]
             );
 
             return response()->json([
-                'message' => 'AI blog post generated with high-fidelity Pro image!',
-                'post' => $post
+                'message' => $telegramShared 
+                    ? 'AI blog post generated and shared to Telegram!' 
+                    : 'AI blog post generated (Telegram sharing skipped or configured OFF).',
+                'post' => $post,
+                'telegram_shared' => $telegramShared
             ]);
 
         } catch (\Throwable $e) {

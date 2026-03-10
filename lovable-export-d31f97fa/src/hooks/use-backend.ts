@@ -484,6 +484,9 @@ export function useAutoBlogStatus() {
   });
 }
 
+/**
+ * Update Auto-Blog settings (including Gemini and Telegram)
+ */
 export function useUpdateAutoBlogSettings() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -74,6 +74,11 @@ export default function AdminBlog() {
   const [localApiKey, setLocalApiKey] = useState("");
   const [localModel, setLocalModel] = useState("");
 
+  // Telegram Settings Local State
+  const [telegramToken, setTelegramToken] = useState("");
+  const [telegramChannel, setTelegramChannel] = useState("");
+  const [telegramEnabled, setTelegramEnabled] = useState(false);
+
   // AI Generation Progress State
   const [progressStep, setProgressStep] = useState(0);
   const steps = [
@@ -81,7 +86,8 @@ export default function AdminBlog() {
     "Contacting Gemini 2.5 Flash...",
     "Writing high-quality content...",
     "Formatting HTML & SEO optimizations...",
-    "Saving to database..."
+    "Saving to database...",
+    "Sharing to Telegram channel..."
   ];
 
   useEffect(() => {
@@ -102,6 +108,9 @@ export default function AdminBlog() {
     if (autoBlogData.settings) {
       setLocalApiKey(autoBlogData.settings.gemini_api_key || "");
       setLocalModel(autoBlogData.settings.gemini_model || "gemini-2.5-flash");
+      setTelegramToken(autoBlogData.settings.telegram_bot_token || "");
+      setTelegramChannel(autoBlogData.settings.telegram_channel_id || "");
+      setTelegramEnabled(autoBlogData.settings.telegram_auto_post_enabled || false);
     }
   }, [autoBlogData.settings]);
 
@@ -171,6 +180,42 @@ export default function AdminBlog() {
 
   const draftCount = posts.filter((p: any) => p.status === "draft").length;
   const publishedCount = posts.filter((p: any) => p.status === "published").length;
+
+  const handleSaveAutomation = () => {
+    updateAutoSettings.mutate({
+      gemini_api_key: localApiKey,
+      gemini_model: localModel,
+      telegram_bot_token: telegramToken,
+      telegram_channel_id: telegramChannel,
+      telegram_auto_post_enabled: telegramEnabled
+    }, {
+      onSuccess: () => toast({
+        title: "Settings Saved",
+        description: "Automation configuration updated successfully."
+      })
+    });
+  };
+
+  // Add a test telegram function
+  const handleTestTelegram = async () => {
+    try {
+      const response = await fetch('/api/admin/blog/automation/telegram-test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}` // simple assumption
+        }
+      });
+      const data = await response.json();
+      if (data.ok) {
+        toast({ title: "Test Success!", description: "Check your Telegram channel." });
+      } else {
+        toast({ variant: "destructive", title: "Test Failed", description: data.description || "Unknown error" });
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: "Error", description: "Could not connect to test API." });
+    }
+  };
 
   return (
     <>
@@ -290,63 +335,94 @@ export default function AdminBlog() {
                 <CardContent className="pt-6 space-y-4">
                   <div className="flex items-center gap-2 font-semibold text-lg">
                     <Key className="h-5 w-5 text-primary" />
-                    Gemini AI Configuration
+                    Core Configuration
                   </div>
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label>Google Gemini API Key</Label>
-                      <div className="flex gap-2">
+                  <Tabs defaultValue="gemini">
+                    <TabsList className="w-full">
+                      <TabsTrigger value="gemini" className="flex-1">Gemini AI</TabsTrigger>
+                      <TabsTrigger value="telegram" className="flex-1">Telegram API</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="gemini" className="space-y-4 mt-4">
+                      <div className="space-y-1.5">
+                        <Label>Google Gemini API Key</Label>
                         <Input
                           type="password"
-                          name="gemini_api_key_field"
-                          autoComplete="new-password"
                           placeholder="AIza..."
                           value={localApiKey}
                           onChange={(e) => setLocalApiKey(e.target.value)}
                         />
+                        <p className="text-[10px] text-muted-foreground">Get your key from Google AI Studio</p>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">Get your key from Google AI Studio</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Model Selection</Label>
-                      <Select
-                        value={localModel}
-                        onValueChange={setLocalModel}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash (Fash & Verified)</SelectItem>
-                          <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Fash & Cheap)</SelectItem>
-                          <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro (High Quality)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="pt-2">
-                      <Button
-                        size="sm"
-                        className="w-full gap-2"
-                        onClick={() => updateAutoSettings.mutate({
-                          gemini_api_key: localApiKey,
-                          gemini_model: localModel
-                        }, {
-                          onSuccess: () => toast({ title: "Settings Saved", description: "Gemini configuration updated successfully." })
-                        })}
-                        disabled={updateAutoSettings.isPending}
-                      >
-                        {updateAutoSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        Save Settings
+                      <div className="space-y-1.5">
+                        <Label>Model Selection</Label>
+                        <Select value={localModel} onValueChange={setLocalModel}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash (Fash & Verified)</SelectItem>
+                            <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Fash & Cheap)</SelectItem>
+                            <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro (High Quality)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between pt-2">
+                        <div className="space-y-0.5">
+                          <Label>Daily Auto-Posting</Label>
+                          <p className="text-xs text-muted-foreground">Automatically post every day at 9 AM</p>
+                        </div>
+                        <Switch
+                          checked={autoBlogData.settings?.auto_posting_enabled}
+                          onCheckedChange={(checked) => updateAutoSettings.mutate({ auto_blog_enabled: checked })}
+                        />
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="telegram" className="space-y-4 mt-4">
+                      <div className="space-y-1.5">
+                        <Label>Telegram Bot Token</Label>
+                        <Input
+                          type="password"
+                          placeholder="000000:ABC-DEF..."
+                          value={telegramToken}
+                          onChange={(e) => setTelegramToken(e.target.value)}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Get Token from @BotFather</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Channel ID / Username</Label>
+                        <Input
+                          placeholder="@my_channel or -100..."
+                          value={telegramChannel}
+                          onChange={(e) => setTelegramChannel(e.target.value)}
+                        />
+                        <p className="text-[10px] text-muted-foreground">Your public channel @username</p>
+                      </div>
+                      <div className="flex items-center justify-between pt-2">
+                        <div className="space-y-0.5">
+                          <Label>Enable Telegram Sharing</Label>
+                          <p className="text-xs text-muted-foreground">Share new articles to Telegram</p>
+                        </div>
+                        <Switch
+                          checked={telegramEnabled}
+                          onCheckedChange={setTelegramEnabled}
+                        />
+                      </div>
+                      <Button variant="outline" size="sm" className="w-full gap-2" onClick={handleTestTelegram}>
+                        <Send className="h-3.5 w-3.5" /> Send Test Message
                       </Button>
-                    </div>
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="space-y-0.5">
-                        <Label>Daily Auto-Posting</Label>
-                        <p className="text-xs text-muted-foreground">Automatically post 1 article every day</p>
-                      </div>
-                      <Switch
-                        checked={autoBlogData.settings?.auto_posting_enabled}
-                        onCheckedChange={(checked) => updateAutoSettings.mutate({ auto_blog_enabled: checked })}
-                      />
-                    </div>
+                    </TabsContent>
+                  </Tabs>
+
+                  <div className="pt-2">
+                    <Button
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={handleSaveAutomation}
+                      disabled={updateAutoSettings.isPending}
+                    >
+                      {updateAutoSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Save All Settings
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
