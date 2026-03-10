@@ -41,6 +41,8 @@ class FacebookService
                     $photoUrl = rtrim($websiteUrl, '/') . '/' . ltrim($photoUrl, '/');
                 }
 
+                Log::info("Facebook: Attempting to share photo: " . $photoUrl);
+
                 $response = Http::withoutVerifying()->post("https://graph.facebook.com/v25.0/{$pageId}/photos", [
                     'url'          => $photoUrl,
                     'caption'      => $message,
@@ -57,7 +59,7 @@ class FacebookService
                 Log::info("Facebook: Post successfully shared: {$post->title}");
                 return true;
             } else {
-                Log::error("Facebook API Error: " . $response->body());
+                Log::error("Facebook API Error for ID {$post->id}: " . $response->body() . " | URL attempted: " . ($photoUrl ?? 'None'));
                 return false;
             }
 
