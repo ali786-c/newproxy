@@ -18,10 +18,13 @@ class XService
     public function sendTweet(BlogPost $post)
     {
         $enabled = Setting::getValue('x_auto_post_enabled', '0') === '1';
-        $apiKey = Setting::getValue('x_api_key');
-        $apiSecret = Setting::getValue('x_api_secret');
-        $accessToken = Setting::getValue('x_access_token');
-        $accessSecret = Setting::getValue('x_access_token_secret');
+        $apiKey = trim(Setting::getValue('x_api_key', ''));
+        $apiSecretEnc = trim(Setting::getValue('x_api_secret', ''));
+        $accessToken = trim(Setting::getValue('x_access_token', ''));
+        $accessSecretEnc = trim(Setting::getValue('x_access_token_secret', ''));
+
+        $apiSecret = $this->decryptServiceKey($apiSecretEnc);
+        $accessSecret = $this->decryptServiceKey($accessSecretEnc);
 
         if (!$enabled || !$apiKey || !$apiSecret || !$accessToken || !$accessSecret) {
             Log::info('X (Twitter): Skipping post share (disabled or missing config).');
@@ -58,10 +61,13 @@ class XService
      */
     public function sendTestTweet($message = "Hello from our AI Blog System! 🚀 Testing X (Twitter) Integration.")
     {
-        $apiKey = Setting::getValue('x_api_key');
-        $apiSecret = Setting::getValue('x_api_secret');
-        $accessToken = Setting::getValue('x_access_token');
-        $accessSecret = Setting::getValue('x_access_token_secret');
+        $apiKey = trim(Setting::getValue('x_api_key', ''));
+        $apiSecretEnc = trim(Setting::getValue('x_api_secret', ''));
+        $accessToken = trim(Setting::getValue('x_access_token', ''));
+        $accessSecretEnc = trim(Setting::getValue('x_access_token_secret', ''));
+
+        $apiSecret = $this->decryptServiceKey($apiSecretEnc);
+        $accessSecret = $this->decryptServiceKey($accessSecretEnc);
 
         if (!$apiKey || !$apiSecret || !$accessToken || !$accessSecret) {
             return [
@@ -89,6 +95,37 @@ class XService
     }
 
     /**
+     * Decrypt sensitive service keys.
+     */
+    private function decryptServiceKey($data)
+    {
+        if (empty($data)) return null;
+        
+        // If it doesn't look like base64-iv format, it might be unencrypted 
+        // (for legacy or if encryption is not yet configured)
+        if (strlen($data) < 32 || !preg_match('%^[a-zA-Z0-9/+]*={0,2}$%', $data)) {
+            return $data; 
+        }
+
+        $encryptionKey = config('services.google.indexing_key');
+        if (!$encryptionKey) return $data;
+
+        try {
+            $decoded = base64_decode($data);
+            $ivLen = openssl_cipher_iv_length('aes-256-cbc');
+            if (strlen($decoded) <= $ivLen) return $data;
+
+            $iv = substr($decoded, 0, $ivLen);
+            $ciphertext = substr($decoded, $ivLen);
+
+            $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', hex2bin($encryptionKey), 0, $iv);
+            return $decrypted !== false ? $decrypted : $data;
+        } catch (\Exception $e) {
+            return $data;
+        }
+    }
+
+    /**
      * Helper to make an OAuth 1.0a signed request.
      */
     private function makeOAuth1Request($method, $url, $data, $apiKey, $apiSecret, $accessToken, $accessSecret)
@@ -100,26 +137,38 @@ class XService
             'oauth_consumer_key' => $apiKey,
             'oauth_nonce' => $nonce,
             'oauth_signature_method' => 'HMAC-SHA1',
-            'oauth_timestamp' => $timestamp,
+            'oauth_timestamp' => (string)$timestamp,
             'oauth_token' => $accessToken,
             'oauth_version' => '1.0',
         ];
 
-        // Base string components
-        $baseStringParams = $params;
-        $baseString = strtoupper($method) . '&' . rawurlencode($url) . '&' . rawurlencode(http_build_query($baseStringParams, '', '&', PHP_QUERY_RFC3986));
+        // Sort parameters alphabetically
+        ksort($params);
+
+        // Build the base string
+        $parameterString = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+        $baseString = strtoupper($method) . '&' . rawurlencode($url) . '&' . rawurlencode($parameterString);
         
         $signingKey = rawurlencode($apiSecret) . '&' . rawurlencode($accessSecret);
         $signature = base64_encode(hash_hmac('sha1', $baseString, $signingKey, true));
 
         $params['oauth_signature'] = $signature;
 
-        // Build Authorization header
+        // Build Authorization header string
         $headerParts = [];
         foreach ($params as $key => $value) {
             $headerParts[] = rawurlencode($key) . '="' . rawurlencode($value) . '"';
         }
         $authHeader = 'OAuth ' . implode(', ', $headerParts);
+
+        // Log for debugging (Sensitive keys masked)
+        $maskedBase = str_replace($apiKey, 'MASKED_KEY', $baseString);
+        Log::info("X (Twitter) OAuth Debug:", [
+            'timestamp' => $timestamp,
+            'server_time' => date('Y-m-d H:i:s'),
+            'base_string_masked' => $maskedBase,
+            'url' => $url
+        ]);
 
         return Http::withoutVerifying()
             ->withHeaders(['Authorization' => $authHeader])

@@ -268,7 +268,9 @@ class AutoBlogController extends Controller
      */
     public function testX(Request $request, \App\Services\XService $x)
     {
+        \Illuminate\Support\Facades\Log::info('Admin X (Twitter) Test Request Received');
         $result = $x->sendTestTweet();
+        \Illuminate\Support\Facades\Log::info('Admin X (Twitter) Test Result:', $result);
         return response()->json($result);
     }
 

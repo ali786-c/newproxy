@@ -18,7 +18,8 @@ class TelegramService
     public function sendBlogPost(BlogPost $post)
     {
         $enabled = Setting::getValue('telegram_auto_post_enabled', '0') === '1';
-        $token = Setting::getValue('telegram_bot_token');
+        $encryptedToken = Setting::getValue('telegram_bot_token');
+        $token = $this->decryptToken($encryptedToken);
         $channelId = Setting::getValue('telegram_channel_id');
 
         if (!$enabled || !$token || !$channelId) {
@@ -69,7 +70,7 @@ class TelegramService
                 Log::warning("Telegram: sendPhoto failed, falling back to sendMessage. Error: " . $response->body());
             }
 
-            // Fallback or No Image: Send as regular message
+        // Fallback or No Image: Send as regular message
             $response = Http::withoutVerifying()->timeout(15)->post("https://api.telegram.org/bot{$token}/sendMessage", [
                 'chat_id' => $channelId,
                 'text'    => $caption,
@@ -95,7 +96,8 @@ class TelegramService
      */
     public function sendTestMessage($message = "Hello from your AI Blog System! 🚀")
     {
-        $token = Setting::getValue('telegram_bot_token');
+        $encryptedToken = Setting::getValue('telegram_bot_token');
+        $token = $this->decryptToken($encryptedToken);
         $channelId = Setting::getValue('telegram_channel_id');
 
         if (!$token || !$channelId) {
@@ -119,6 +121,33 @@ class TelegramService
                 'ok' => false,
                 'description' => "Connection Error: " . $e->getMessage()
             ];
+        }
+    }
+
+    /**
+     * Decrypt sensitive service keys.
+     */
+    private function decryptToken($data)
+    {
+        if (empty($data)) return $data;
+        
+        $key = config('services.google.indexing_key');
+        if (!$key) return $data;
+
+        try {
+            $decoded = base64_decode($data);
+            $ivLen = openssl_cipher_iv_length('aes-256-cbc');
+            
+            if (strlen($decoded) <= $ivLen) return $data;
+
+            $iv = substr($decoded, 0, $ivLen);
+            $ciphertext = substr($decoded, $ivLen);
+
+            $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', hex2bin($key), 0, $iv);
+            
+            return $decrypted ?: $data;
+        } catch (\Exception $e) {
+            return $data;
         }
     }
 }
