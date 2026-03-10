@@ -59,9 +59,18 @@ class GoogleIndexingService
         $encryptedJson = Setting::getValue('google_indexing_json');
         if (!$encryptedJson) return null;
 
-        // Use controller's decryption (lightweight refactor would move this to a trait or Setting model)
-        $controller = new \App\Http\Controllers\AutoBlogController();
-        $json = $controller->decryptServiceKey($encryptedJson);
+        $key = config('services.google.indexing_key');
+        if (!$key) {
+            Log::error('Google Indexing: CRYPTO_KEY missing in config.');
+            return null;
+        }
+
+        $decoded = base64_decode($encryptedJson);
+        $ivLen = openssl_cipher_iv_length('aes-256-cbc');
+        $iv = substr($decoded, 0, $ivLen);
+        $ciphertext = substr($decoded, $ivLen);
+
+        $json = openssl_decrypt($ciphertext, 'aes-256-cbc', hex2bin($key), 0, $iv);
         
         $config = json_decode($json, true);
         if (!$config || !isset($config['private_key'])) return null;

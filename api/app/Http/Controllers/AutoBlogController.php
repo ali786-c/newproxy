@@ -122,9 +122,13 @@ class AutoBlogController extends Controller
             \App\Models\Setting::updateOrCreate(['key' => 'google_indexing_enabled'], ['value' => $request->google_indexing_enabled ? '1' : '0']);
         }
 
-        if ($request->has('google_indexing_json') && !empty($request->google_indexing_json)) {
-            $encrypted = $this->encryptServiceKey($request->google_indexing_json);
-            \App\Models\Setting::updateOrCreate(['key' => 'google_indexing_json'], ['value' => $encrypted]);
+        if ($request->has('google_indexing_json')) {
+            if (!empty($request->google_indexing_json)) {
+                $encrypted = $this->encryptServiceKey($request->google_indexing_json);
+                \App\Models\Setting::updateOrCreate(['key' => 'google_indexing_json'], ['value' => $encrypted]);
+            }
+            // If it's explicitly null/empty AND the field was sent, we might want to clear it, 
+            // but for now, the UI preserves it.
         }
 
         \App\Models\AdminLog::log(
@@ -274,7 +278,7 @@ class AutoBlogController extends Controller
      */
     private function encryptServiceKey($data)
     {
-        $key = env('GOOGLE_INDEXING_CRYPTO_KEY');
+        $key = config('services.google.indexing_key');
         if (!$key) return $data;
 
         $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
@@ -288,7 +292,7 @@ class AutoBlogController extends Controller
      */
     public function decryptServiceKey($data)
     {
-        $key = env('GOOGLE_INDEXING_CRYPTO_KEY');
+        $key = config('services.google.indexing_key');
         if (!$key || empty($data)) return null;
 
         $decoded = base64_decode($data);
@@ -296,6 +300,12 @@ class AutoBlogController extends Controller
         $iv = substr($decoded, 0, $ivLen);
         $ciphertext = substr($decoded, $ivLen);
 
-        return openssl_decrypt($ciphertext, 'aes-256-cbc', hex2bin($key), 0, $iv);
+        $decrypted = openssl_decrypt($ciphertext, 'aes-256-cbc', hex2bin($key), 0, $iv);
+        
+        if ($decrypted === false) {
+            \Illuminate\Support\Facades\Log::error('Indexing JSON Decryption Failed: Invalid key or corrupted data.');
+        }
+
+        return $decrypted;
     }
 }
