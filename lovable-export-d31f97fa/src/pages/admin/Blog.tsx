@@ -611,6 +611,7 @@ export default function AdminBlog() {
                             placeholder="e.g. 327892273751355"
                             value={facebookPageId}
                             onChange={(e) => setFacebookPageId(e.target.value)}
+                            autoComplete="off"
                           />
                         </div>
                         <div className="grid gap-2">
@@ -622,6 +623,7 @@ export default function AdminBlog() {
                               placeholder={facebookConfigured ? "••••••••••••••••" : "Paste your Page Access Token"}
                               value={facebookToken}
                               onChange={(e) => setFacebookToken(e.target.value)}
+                              autoComplete="off"
                             />
                             {facebookConfigured && !facebookToken && (
                               <span className="absolute right-3 top-2.5 text-[10px] text-green-500 font-medium">CONFIGURED</span>
