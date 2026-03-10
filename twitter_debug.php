@@ -3,10 +3,10 @@
  * Standalone Twitter API v2 Debug Script (Enhanced)
  */
 
-$apiKey       = "sCimmw3m9wTU76SXtIqytuFT2";
-$apiSecret    = "nJvLQdbueydd4c9xNWlgZkv6nF527Yl3QwYzp93bkJzDph8oPu";
-$accessToken  = "2031414293149974528-6xHRdxY3R40pZXPcxaN3CvtIvpFSwx";
-$accessSecret = "a0lZJlYFFmhE9bFL18ncXhhZOTnyM7ytCM3k6tKV8hY21";
+$apiKey       = "fMUpYVeZttCdMN87VDAmX7OPR";
+$apiSecret    = "k8PfgWQgIKVVrJp6TMCqHHIejgFUFNENqFzWje5UqBLxmyRkcB";
+$accessToken  = "2031414293149974528-zCu1aqrLBd2qQvIgj4NeVCpvXuPTo8";
+$accessSecret = "kj6ed48I7MfVZjMUjLfeTonlgmcD9c6jyt3YL1DSCa7Ep";
 
 echo "<h1>Twitter API v2 Debugger</h1>";
 echo "<pre>";
