@@ -17,6 +17,11 @@ ErrorDocument 404 /index.php
     RewriteCond %{REQUEST_URI} ^/api [NC]
     RewriteRule ^ - [L]
 
+    # Explicit 404 for missing assets (prevents MIME mismatch errors)
+    RewriteCond %{REQUEST_URI} ^/assets/ [NC]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ - [R=404,L]
+
     # Send all other requests to index.php if file/folder doesn't exist
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
