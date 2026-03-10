@@ -101,6 +101,9 @@ export default function AdminBlog() {
   const [googleConfigured, setGoogleConfigured] = useState(false);
 
   const [facebookConfigured, setFacebookConfigured] = useState(false);
+  const [facebookPageId, setFacebookPageId] = useState("");
+  const [facebookToken, setFacebookToken] = useState("");
+  const [facebookAutoEnabled, setFacebookAutoEnabled] = useState(false);
 
   // X (Twitter) Settings Local State
   const [xApiKey, setXApiKey] = useState("");
