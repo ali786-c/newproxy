@@ -29,7 +29,7 @@ class GenerateAIPost extends Command
     /**
      * Execute the console command.
      */
-    public function handle(GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing)
+    public function handle(GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing, \App\Services\FacebookService $facebook)
     {
         Log::info('Cron: Starting Robust AI blog generation...');
 
@@ -87,10 +87,13 @@ class GenerateAIPost extends Command
             // 5. Telegram Share
             $telegram->sendBlogPost($post);
 
-            // 6. Google Indexing
+            // 6. Facebook Share
+            $facebook->sendBlogPost($post);
+
+            // 7. Google Indexing
             $indexing->publishUrl(url('/blog/' . $post->slug));
 
-            Log::info("Cron: Success! Blog published: {$post->title}");
+            Log::info("Cron: Success! Blog published and shared: {$post->title}");
             
         } catch (\Exception $e) {
             Log::error("Cron: AI Generation Failed: " . $e->getMessage());

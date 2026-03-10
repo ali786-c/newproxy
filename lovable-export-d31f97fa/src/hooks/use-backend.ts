@@ -552,6 +552,19 @@ export function useSharePostToTelegram() {
   });
 }
 
+export function useTestFacebookSharing() {
+  return useMutation({
+    mutationFn: () => api.post("/admin/blog/automation/facebook-test", z.any()),
+  });
+}
+
+export function useSharePostToFacebook() {
+  return useMutation({
+    mutationFn: (postId: number | string) =>
+      api.post("/admin/blog/automation/facebook-share-post", z.any(), { post_id: postId }),
+  });
+}
+
 // Alert Hooks
 export function useAdminAlertConfig() {
   return useQuery({

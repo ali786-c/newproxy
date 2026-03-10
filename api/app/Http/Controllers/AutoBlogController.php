@@ -33,6 +33,10 @@ class AutoBlogController extends Controller
                 // Google Indexing settings
                 'google_indexing_enabled' => Setting::getValue('google_indexing_enabled', '0') === '1',
                 'google_indexing_configured' => !empty(Setting::getValue('google_indexing_json')),
+                // Facebook settings
+                'facebook_page_id' => Setting::getValue('facebook_page_id') ?: '',
+                'facebook_auto_post_enabled' => Setting::getValue('facebook_auto_post_enabled', '0') === '1',
+                'facebook_access_token_configured' => !empty(Setting::getValue('facebook_access_token')),
             ]
         ]);
     }
@@ -92,6 +96,9 @@ class AutoBlogController extends Controller
             'telegram_auto_post_enabled' => 'nullable|boolean',
             'google_indexing_enabled' => 'nullable|boolean',
             'google_indexing_json' => 'nullable|string',
+            'facebook_page_id' => 'nullable|string',
+            'facebook_access_token' => 'nullable|string',
+            'facebook_auto_post_enabled' => 'nullable|boolean',
         ]);
 
         if ($request->has('gemini_api_key')) {
@@ -131,11 +138,26 @@ class AutoBlogController extends Controller
             // but for now, the UI preserves it.
         }
 
+        if ($request->has('facebook_page_id')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'facebook_page_id'], ['value' => $request->facebook_page_id]);
+        }
+
+        if ($request->has('facebook_access_token')) {
+            if (!empty($request->facebook_access_token)) {
+                $encrypted = $this->encryptServiceKey($request->facebook_access_token);
+                \App\Models\Setting::updateOrCreate(['key' => 'facebook_access_token'], ['value' => $encrypted]);
+            }
+        }
+
+        if ($request->has('facebook_auto_post_enabled')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'facebook_auto_post_enabled'], ['value' => $request->facebook_auto_post_enabled ? '1' : '0']);
+        }
+
         \App\Models\AdminLog::log(
             'update_autoblog_settings',
             "Updated Auto-Blog Settings (including Telegram & Indexing)",
             null,
-            $request->except(['gemini_api_key', 'telegram_bot_token', 'google_indexing_json']) // Don't log sensitive keys
+            $request->except(['gemini_api_key', 'telegram_bot_token', 'google_indexing_json', 'facebook_access_token']) // Don't log sensitive keys
         );
 
         return response()->json(['message' => 'Settings updated.']);
@@ -205,9 +227,39 @@ class AutoBlogController extends Controller
     }
 
     /**
+     * Admin: Test Facebook Page connectivity.
+     */
+    public function testFacebook(Request $request, \App\Services\FacebookService $facebook)
+    {
+        return response()->json($facebook->sendTestMessage());
+    }
+
+    /**
+     * Admin: Manually share a specific blog post to Facebook.
+     */
+    public function sharePostToFacebook(Request $request, \App\Services\FacebookService $facebook)
+    {
+        \Illuminate\Support\Facades\Log::info('Admin Facebook Share Request Received', ['post_id' => $request->post_id]);
+
+        $request->validate([
+            'post_id' => 'required|exists:blog_posts,id'
+        ]);
+
+        $post = \App\Models\BlogPost::findOrFail($request->post_id);
+        
+        $success = $facebook->sendBlogPost($post);
+
+        if ($success) {
+            return response()->json(['message' => 'Post shared to Facebook successfully!']);
+        }
+
+        return response()->json(['message' => 'Facebook sharing failed. Check logs.'], 500);
+    }
+
+    /**
      * Admin: Manually trigger a blog post generation.
      */
-    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing)
+    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing, \App\Services\FacebookService $facebook)
     {
         $keywordObj = null;
 
@@ -289,22 +341,24 @@ class AutoBlogController extends Controller
             // 6. Share to Telegram (Background aware service)
             $telegramShared = $telegram->sendBlogPost($post);
 
-            // 7. Notify Google Indexing API
+            // 7. Share to Facebook
+            $facebookShared = $facebook->sendBlogPost($post);
+
+            // 8. Notify Google Indexing API
             $indexing->publishUrl(url('/blog/' . $post->slug));
 
             \App\Models\AdminLog::log(
                 'trigger_autoblog',
-                "Generated AI blog" . ($telegramShared ? " & Shared to Telegram" : "") . ": '{$post->title}'",
+                "Generated AI blog. Telegram: " . ($telegramShared ? "YES" : "NO") . " | Facebook: " . ($facebookShared ? "YES" : "NO"),
                 null,
-                ['post_id' => $post->id, 'keyword' => $keywordObj->keyword, 'telegram_shared' => $telegramShared]
+                ['post_id' => $post->id, 'keyword' => $keywordObj->keyword, 'telegram_shared' => $telegramShared, 'facebook_shared' => $facebookShared]
             );
 
             return response()->json([
-                'message' => $telegramShared 
-                    ? 'AI blog post generated and shared to Telegram!' 
-                    : 'AI blog post generated (Telegram sharing skipped or configured OFF).',
+                'message' => 'AI blog post generated successfully!',
                 'post' => $post,
-                'telegram_shared' => $telegramShared
+                'telegram_shared' => $telegramShared,
+                'facebook_shared' => $facebookShared
             ]);
 
         } catch (\Throwable $e) {

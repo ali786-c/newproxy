@@ -17,7 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Send, Clock, FileText, Search, Plus, Trash2, Edit2, Loader2, Globe, Mail, Settings, Rss, Eye, Sparkles, Save, Bot, Key, Zap
+  Send, Clock, FileText, Search, Plus, Trash2, Edit2, Loader2, Globe, Mail, Settings, Rss, Eye, Sparkles, Save, Bot, Key, Zap, Facebook
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
@@ -36,6 +36,8 @@ import {
   useTestGoogleIndexing,
   useSubmitUrlToIndex,
   useSharePostToTelegram,
+  useTestFacebookSharing,
+  useSharePostToFacebook,
 } from "@/hooks/use-backend";
 
 const STATUS_BADGE: Record<string, "default" | "secondary" | "outline"> = {
@@ -74,6 +76,8 @@ export default function AdminBlog() {
   const testIndexing = useTestGoogleIndexing();
   const submitToIndex = useSubmitUrlToIndex();
   const shareToTelegram = useSharePostToTelegram();
+  const testFacebook = useTestFacebookSharing();
+  const shareToFacebook = useSharePostToFacebook();
 
   const [newKeyword, setNewKeyword] = useState("");
   const [newCategory, setNewCategory] = useState("General");
@@ -92,6 +96,12 @@ export default function AdminBlog() {
   const [googleJson, setGoogleJson] = useState("");
   const [googleConfigured, setGoogleConfigured] = useState(false);
 
+  // Facebook Settings Local State
+  const [facebookPageId, setFacebookPageId] = useState("");
+  const [facebookToken, setFacebookToken] = useState("");
+  const [facebookAutoEnabled, setFacebookAutoEnabled] = useState(false);
+  const [facebookConfigured, setFacebookConfigured] = useState(false);
+
   // AI Generation Progress State
   const [progressStep, setProgressStep] = useState(0);
   const steps = [
@@ -100,7 +110,8 @@ export default function AdminBlog() {
     "Writing high-quality content...",
     "Formatting HTML & SEO optimizations...",
     "Saving to database...",
-    "Sharing to Telegram channel..."
+    "Sharing to Telegram channel...",
+    "Posting to Facebook Page..."
   ];
 
   useEffect(() => {
@@ -127,6 +138,10 @@ export default function AdminBlog() {
 
       setGoogleIndexingEnabled(autoBlogData.settings.google_indexing_enabled || false);
       setGoogleConfigured(autoBlogData.settings.google_indexing_configured || false);
+
+      setFacebookPageId(autoBlogData.settings.facebook_page_id || "");
+      setFacebookAutoEnabled(autoBlogData.settings.facebook_auto_post_enabled || false);
+      setFacebookConfigured(autoBlogData.settings.facebook_access_token_configured || false);
     }
   }, [autoBlogData]);
 
@@ -152,6 +167,21 @@ export default function AdminBlog() {
         setIsEditOpen(false);
         resetForm();
         toast({ title: "Post updated" });
+      }
+    });
+  };
+
+  const handleTestFacebook = () => {
+    testFacebook.mutate(undefined, {
+      onSuccess: (data: any) => {
+        if (data.ok) {
+          toast({ title: "Facebook Connection Success", description: data.description || "Test post shared successfully!" });
+        } else {
+          toast({ title: "Facebook Test Failed", description: data.description || "Check your Page ID and Token.", variant: "destructive" });
+        }
+      },
+      onError: (err: any) => {
+        toast({ title: "Test Error", description: err.message || "Failed to contact API.", variant: "destructive" });
       }
     });
   };
@@ -204,9 +234,13 @@ export default function AdminBlog() {
       telegram_auto_post_enabled: telegramEnabled,
       google_indexing_enabled: googleIndexingEnabled,
       google_indexing_json: googleJson,
+      facebook_page_id: facebookPageId,
+      facebook_access_token: facebookToken,
+      facebook_auto_post_enabled: facebookAutoEnabled,
     }, {
       onSuccess: () => {
         setGoogleJson(""); // Clear for security
+        setFacebookToken(""); // Clear for security
         toast({
           title: "Settings Saved",
           description: "Automation configuration updated successfully."
@@ -375,6 +409,32 @@ export default function AdminBlog() {
                                 <Send className="h-3.5 w-3.5" />
                               )}
                             </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                shareToFacebook.mutate(post.id, {
+                                  onSuccess: (data: any) => toast({
+                                    title: "Facebook Share",
+                                    description: data.message
+                                  }),
+                                  onError: (error: any) => toast({
+                                    variant: "destructive",
+                                    title: "Error",
+                                    description: error?.message || "Failed to share to Facebook"
+                                  })
+                                });
+                              }}
+                              disabled={shareToFacebook.isPending || post.is_draft}
+                              className="h-8 w-8 text-blue-600 hover:text-blue-700"
+                              title="Send to Facebook"
+                            >
+                              {shareToFacebook.isPending && shareToFacebook.variables === post.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Facebook className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => openEdit(post)} className="h-8 w-8">
                               <Edit2 className="h-3.5 w-3.5" />
                             </Button>
@@ -418,10 +478,11 @@ export default function AdminBlog() {
                     Core Configuration
                   </div>
                   <Tabs defaultValue="gemini">
-                    <TabsList className="w-full">
-                      <TabsTrigger value="gemini" className="flex-1">Gemini AI</TabsTrigger>
-                      <TabsTrigger value="telegram" className="flex-1">Telegram API</TabsTrigger>
-                      <TabsTrigger value="indexing" className="flex-1">SEO / Indexing</TabsTrigger>
+                    <TabsList className="grid grid-cols-4 w-full h-auto">
+                      <TabsTrigger value="gemini" className="text-xs">Gemini AI</TabsTrigger>
+                      <TabsTrigger value="telegram" className="text-xs">Telegram</TabsTrigger>
+                      <TabsTrigger value="indexing" className="text-xs">Indexing</TabsTrigger>
+                      <TabsTrigger value="facebook" className="text-xs">Facebook</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="gemini" className="space-y-4 mt-4">
@@ -528,6 +589,56 @@ export default function AdminBlog() {
                         {testIndexing.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
                         {testIndexing.isPending ? "Connecting to Google..." : "Test Google Indexing"}
                       </Button>
+                    </TabsContent>
+
+                    <TabsContent value="facebook" className="space-y-4 pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium">Automatic Facebook Sharing</h4>
+                          <p className="text-xs text-muted-foreground">Share every new blog post to your Facebook Page automatically.</p>
+                        </div>
+                        <Switch
+                          checked={facebookAutoEnabled}
+                          onCheckedChange={setFacebookAutoEnabled}
+                        />
+                      </div>
+
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="fb-page-id">Facebook Page ID</Label>
+                          <Input
+                            id="fb-page-id"
+                            placeholder="e.g. 327892273751355"
+                            value={facebookPageId}
+                            onChange={(e) => setFacebookPageId(e.target.value)}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="fb-token">Page Access Token</Label>
+                          <div className="relative">
+                            <Input
+                              id="fb-token"
+                              type="password"
+                              placeholder={facebookConfigured ? "••••••••••••••••" : "Paste your Page Access Token"}
+                              value={facebookToken}
+                              onChange={(e) => setFacebookToken(e.target.value)}
+                            />
+                            {facebookConfigured && !facebookToken && (
+                              <span className="absolute right-3 top-2.5 text-[10px] text-green-500 font-medium">CONFIGURED</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">This token is stored encrypted in our database.</p>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          onClick={handleTestFacebook}
+                          disabled={testFacebook.isPending}
+                          className="w-full flex items-center justify-center gap-2"
+                        >
+                          {testFacebook.isPending ? "Testing..." : <><Facebook className="h-4 w-4" /> Test Facebook Post</>}
+                        </Button>
+                      </div>
                     </TabsContent>
                   </Tabs>
 
