@@ -162,8 +162,8 @@ class XService
         $authHeader = 'OAuth ' . implode(', ', $headerParts);
 
         // Log for debugging (Sensitive keys masked)
-        $maskedBase = str_replace($apiKey, 'MASKED_KEY', $baseString);
-        Log::info("X (Twitter) OAuth Debug:", [
+        $maskedBase = str_replace([$apiKey, $accessToken], ['MASKED_CONSUMER_KEY', 'MASKED_ACCESS_TOKEN'], $baseString);
+        \App\Models\AdminLog::log('x_oauth_debug', 'X (Twitter) OAuth Debug Signature', null, [
             'timestamp' => $timestamp,
             'server_time' => date('Y-m-d H:i:s'),
             'base_string_masked' => $maskedBase,

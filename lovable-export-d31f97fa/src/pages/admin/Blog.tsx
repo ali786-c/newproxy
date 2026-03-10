@@ -157,6 +157,7 @@ export default function AdminBlog() {
       setFacebookConfigured(autoBlogData.settings.facebook_access_token_configured || false);
 
       setXApiKey(autoBlogData.settings.x_api_key || "");
+      setXAccessToken(autoBlogData.settings.x_access_token || "");
       setXAutoEnabled(autoBlogData.settings.x_auto_post_enabled || false);
       setXSecretConfigured(autoBlogData.settings.x_api_secret_configured || false);
       setXTokenSecretConfigured(autoBlogData.settings.x_access_token_secret_configured || false);
