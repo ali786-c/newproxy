@@ -38,7 +38,7 @@ class XService
 
             $text = $post->title . "\n\n" . "Read more: " . $postUrl;
 
-            $response = $this->makeOAuth1Request('POST', 'https://api.twitter.com/2/tweets', [
+            $response = $this->makeOAuth1Request('POST', 'https://api.x.com/2/tweets', [
                 'text' => $text
             ], $apiKey, $apiSecret, $accessToken, $accessSecret);
 
@@ -77,7 +77,7 @@ class XService
         }
 
         try {
-            $response = $this->makeOAuth1Request('POST', 'https://api.twitter.com/2/tweets', [
+            $response = $this->makeOAuth1Request('POST', 'https://api.x.com/2/tweets', [
                 'text' => $message
             ], $apiKey, $apiSecret, $accessToken, $accessSecret);
 

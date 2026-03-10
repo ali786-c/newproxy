@@ -60,12 +60,12 @@ function makeOAuth1Request($method, $url, $data, $apiKey, $apiSecret, $accessTok
 }
 
 echo "<h2>Step 1: Testing GET /2/users/me (Verify Keys)</h2>";
-$res1 = makeOAuth1Request('GET', 'https://api.twitter.com/2/users/me', null, $apiKey, $apiSecret, $accessToken, $accessSecret);
+$res1 = makeOAuth1Request('GET', 'https://api.x.com/2/users/me', null, $apiKey, $apiSecret, $accessToken, $accessSecret);
 echo "Status: " . $res1['code'] . "\n";
 echo "Body: " . $res1['body'] . "\n";
 
 echo "<h2>Step 2: Testing POST /2/tweets (Verify Write Permissions)</h2>";
-$res2 = makeOAuth1Request('POST', 'https://api.twitter.com/2/tweets', ['text' => "Testing from debugger " . time()], $apiKey, $apiSecret, $accessToken, $accessSecret);
+$res2 = makeOAuth1Request('POST', 'https://api.x.com/2/tweets', ['text' => "Testing from debugger " . time()], $apiKey, $apiSecret, $accessToken, $accessSecret);
 echo "Status: " . $res2['code'] . "\n";
 echo "Body: " . $res2['body'] . "\n";
 
