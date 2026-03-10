@@ -160,6 +160,27 @@ class AutoBlogController extends Controller
     }
 
     /**
+     * Admin: Manually index a specific blog post.
+     */
+    public function indexPost(Request $request, \App\Services\GoogleIndexingService $indexing)
+    {
+        $request->validate([
+            'post_id' => 'required|exists:blog_posts,id'
+        ]);
+
+        $post = \App\Models\BlogPost::findOrFail($request->post_id);
+        $url = url('/blog/' . $post->slug);
+
+        $success = $indexing->publishUrl($url);
+
+        if ($success) {
+            return response()->json(['message' => 'URL submitted to Google successfully!']);
+        }
+
+        return response()->json(['message' => 'Indexing failed. Check logs.'], 500);
+    }
+
+    /**
      * Admin: Manually trigger a blog post generation.
      */
     public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing)
