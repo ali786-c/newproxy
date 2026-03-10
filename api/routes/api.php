@@ -179,6 +179,7 @@ Route::middleware(['auth:sanctum', 'role:admin', 'throttle:60,1'])->prefix('admi
     });
     Route::post('/blog/automation/google-test', [\App\Http\Controllers\AutoBlogController::class, 'testIndexing']);
     Route::post('/blog/automation/google-index-post', [\App\Http\Controllers\AutoBlogController::class, 'indexPost']);
+    Route::post('/blog/automation/telegram-share-post', [\App\Http\Controllers\AutoBlogController::class, 'sharePostToTelegram']);
 
     // Admin Products Management
     Route::get('/products',          [\App\Http\Controllers\ProductController::class, 'adminIndex']);

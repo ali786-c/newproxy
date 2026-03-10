@@ -35,6 +35,7 @@ import {
   useTestTelegram,
   useTestGoogleIndexing,
   useSubmitUrlToIndex,
+  useSharePostToTelegram,
 } from "@/hooks/use-backend";
 
 const STATUS_BADGE: Record<string, "default" | "secondary" | "outline"> = {
@@ -72,6 +73,7 @@ export default function AdminBlog() {
   const testTelegram = useTestTelegram();
   const testIndexing = useTestGoogleIndexing();
   const submitToIndex = useSubmitUrlToIndex();
+  const shareToTelegram = useSharePostToTelegram();
 
   const [newKeyword, setNewKeyword] = useState("");
   const [newCategory, setNewCategory] = useState("General");
@@ -345,6 +347,32 @@ export default function AdminBlog() {
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
                                 <Zap className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                shareToTelegram.mutate(post.id, {
+                                  onSuccess: (data: any) => toast({
+                                    title: "Telegram Share",
+                                    description: data.message
+                                  }),
+                                  onError: (error: any) => toast({
+                                    variant: "destructive",
+                                    title: "Error",
+                                    description: error?.message || "Failed to share to Telegram"
+                                  })
+                                });
+                              }}
+                              disabled={shareToTelegram.isPending || post.is_draft}
+                              className="h-8 w-8 text-green-500 hover:text-green-600"
+                              title="Send to Telegram"
+                            >
+                              {shareToTelegram.isPending && shareToTelegram.variables === post.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Send className="h-3.5 w-3.5" />
                               )}
                             </Button>
                             <Button size="icon" variant="ghost" onClick={() => openEdit(post)} className="h-8 w-8">

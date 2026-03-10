@@ -183,6 +183,28 @@ class AutoBlogController extends Controller
     }
 
     /**
+     * Admin: Manually share a specific blog post to Telegram.
+     */
+    public function sharePostToTelegram(Request $request, \App\Services\TelegramService $telegram)
+    {
+        \Illuminate\Support\Facades\Log::info('Admin Telegram Share Request Received', ['post_id' => $request->post_id]);
+
+        $request->validate([
+            'post_id' => 'required|exists:blog_posts,id'
+        ]);
+
+        $post = \App\Models\BlogPost::findOrFail($request->post_id);
+        
+        $success = $telegram->sendBlogPost($post);
+
+        if ($success) {
+            return response()->json(['message' => 'Post shared to Telegram successfully!']);
+        }
+
+        return response()->json(['message' => 'Telegram sharing failed. Check logs.'], 500);
+    }
+
+    /**
      * Admin: Manually trigger a blog post generation.
      */
     public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing)

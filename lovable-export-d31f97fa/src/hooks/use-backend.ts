@@ -545,6 +545,13 @@ export function useSubmitUrlToIndex() {
   });
 }
 
+export function useSharePostToTelegram() {
+  return useMutation({
+    mutationFn: (postId: number | string) =>
+      api.post("/admin/blog/automation/telegram-share-post", z.any(), { post_id: postId }),
+  });
+}
+
 // Alert Hooks
 export function useAdminAlertConfig() {
   return useQuery({
