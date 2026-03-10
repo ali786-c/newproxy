@@ -309,6 +309,22 @@ HTML;
                              <p style="margin:0; font-size:14px; color:#64748b;">If you believe this is an error, please contact support.</p>',
                 'variables' => ['user.name', 'amount', 'description', 'status', 'year'],
             ],
+            [
+                'key' => 'email_verification',
+                'name' => 'Email Verification Code',
+                'subject' => '{{verification_code}} is your verification code',
+                'content' => '<h2 style="margin:0 0 16px; font-size:22px; color:#0f172a; text-align:center;">Verify Your Email Address</h2>
+                             <p style="margin:0 0 24px; font-size:15px; color:#334155; line-height:1.7; text-align:center;">Thank you for joining <strong>{{app.name}}</strong>! Please use the following 6-digit code to complete your registration and verify your account.</p>
+                             <div style="background:#f0fdf4; padding:32px; border-radius:16px; text-align:center; border:2px dashed #25935f; margin-bottom:24px;">
+                                <div style="font-size:36px; font-weight:900; letter-spacing:10px; color:#25935f; margin-bottom:8px;">{{verification_code}}</div>
+                                <div style="font-size:12px; color:#166534; font-weight:600; text-transform:uppercase; letter-spacing:1px;">Expires in 15 minutes</div>
+                             </div>
+                             <p style="margin:0 0 20px; font-size:14px; color:#475569; line-height:1.6; text-align:center;">Simply enter this code on the verification screen to proceed.</p>
+                             <div style="padding-top:20px; border-top:1px solid #e2e8f0; text-align:center;">
+                                <p style="margin:0; font-size:12px; color:#94a3b8;">If you did not request this verification, you can safely ignore this email.</p>
+                             </div>',
+                'variables' => ['verification_code', 'app.name', 'year'],
+            ],
         ];
 
         foreach ($templates as $t) {
