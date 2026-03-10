@@ -36,12 +36,19 @@ class FacebookService
             // Handle Image vs Text-only post
             if (!empty($post->image_url)) {
                 $photoUrl = $post->image_url;
-                // Make URL absolute if it's relative
-                if (!str_starts_with($photoUrl, 'http')) {
-                    $photoUrl = rtrim($websiteUrl, '/') . '/' . ltrim($photoUrl, '/');
+                
+                // If it's already an absolute URL, use it
+                if (str_starts_with($photoUrl, 'http')) {
+                    // No change needed
+                } else {
+                    // It's a relative path starting with 'api/storage/...' or '/api/storage/...'
+                    // We need to append it to the BASE website URL (upgraderproxy.com)
+                    // NOT to the APP_URL if it already includes /api
+                    $rootUrl = str_replace('/api', '', rtrim($websiteUrl, '/'));
+                    $photoUrl = $rootUrl . '/' . ltrim($photoUrl, '/');
                 }
 
-                Log::info("Facebook: Attempting to share photo: " . $photoUrl);
+                Log::info("Facebook: Attempting to share photo [Post ID: {$post->id}]: " . $photoUrl);
 
                 $response = Http::withoutVerifying()->post("https://graph.facebook.com/v25.0/{$pageId}/photos", [
                     'url'          => $photoUrl,
