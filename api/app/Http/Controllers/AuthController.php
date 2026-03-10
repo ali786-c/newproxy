@@ -13,6 +13,7 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Cache;
 use App\Services\EvomiService;
 use PragmaRX\Google2FALaravel\Facade as Google2FA;
+use App\Notifications\EmailVerificationNotification;
 
 class AuthController extends Controller
 {
@@ -61,6 +62,19 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
+        
+        // --- NEW: Email Verification OTP ---
+        $code = (string) random_int(100000, 999999);
+        $user->email_verification_code = $code;
+        $user->email_verification_expires_at = now()->addMinutes(15);
+        $user->save();
+
+        try {
+            $user->notify(new \App\Notifications\EmailVerificationNotification($code));
+        } catch (\Exception $e) {
+            \Log::error("Registration OTP Error: " . $e->getMessage());
+        }
+        // ------------------------------------
 
         // --- NEW: Trigger Dynamic Emails ---
         try {
@@ -363,14 +377,16 @@ class AuthController extends Controller
     private function formatUser(User $user): array
     {
         return [
-            'id'            => (string) $user->id,
-            'name'          => $user->name,
-            'email'         => $user->email,
-            'role'          => $user->role,
-            'balance'       => (float) $user->balance,
-            'referral_code' => $user->referral_code,
-            'avatar'        => $user->avatar,
-            'is_2fa_enabled'=> $user->hasTwoFactorEnabled(),
+            'id'                => (string) $user->id,
+            'name'              => $user->name,
+            'email'             => $user->email,
+            'role'              => $user->role,
+            'balance'           => (float) $user->balance,
+            'referral_code'     => $user->referral_code,
+            'avatar'            => $user->avatar,
+            'is_2fa_enabled'    => $user->hasTwoFactorEnabled(),
+            'email_verified_at' => $user->email_verified_at ? $user->email_verified_at->toIso8601String() : null,
+            'has_claimed_trial' => (bool) $user->has_claimed_trial,
         ];
     }
 
@@ -457,5 +473,83 @@ class AuthController extends Controller
         $user->save();
 
         return response()->json(['message' => 'Top-up settings updated successfully.']);
+    }
+
+    /**
+     * Resend verification code.
+     * POST /auth/resend-verification
+     */
+    public function resendVerification(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->email_verified_at) {
+            return response()->json(['message' => 'Email already verified.'], 400);
+        }
+
+        // Throttle check: 60 seconds cooldown
+        $cacheKey = "resend_otp_cooldown_{$user->id}";
+        if (Cache::has($cacheKey)) {
+            $seconds = Cache::get($cacheKey) - time();
+            if ($seconds > 0) {
+                return response()->json([
+                    'message' => "Please wait {$seconds} seconds before requesting a new code."
+                ], 429);
+            }
+        }
+
+        // Generate Code
+        $code = (string) random_int(100000, 999999);
+        $user->email_verification_code = $code;
+        $user->email_verification_expires_at = now()->addMinutes(15);
+        $user->save();
+
+        // Send Notification
+        try {
+            $user->notify(new EmailVerificationNotification($code));
+        } catch (\Exception $e) {
+            \Log::error("OTP Notification Error: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to send email. Please check your SMTP settings.'], 500);
+        }
+
+        // Set Cooldown (using absolute time to calculate remaining seconds easily)
+        Cache::put($cacheKey, time() + 60, 60);
+
+        return response()->json(['message' => 'Verification code sent to your email.']);
+    }
+
+    /**
+     * Verify email with OTP.
+     * POST /auth/verify-email
+     */
+    public function verifyEmail(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|size:6',
+        ]);
+
+        $user = $request->user();
+
+        if ($user->email_verified_at) {
+            return response()->json(['message' => 'Email already verified.'], 400);
+        }
+
+        if (!$user->email_verification_code || $user->email_verification_code !== $request->code) {
+            return response()->json(['message' => 'Invalid verification code.'], 422);
+        }
+
+        if ($user->email_verification_expires_at && now()->isAfter($user->email_verification_expires_at)) {
+            return response()->json(['message' => 'Verification code has expired.'], 422);
+        }
+
+        $user->email_verified_at = now();
+        $user->email_verification_code = null;
+        $user->email_verification_expires_at = null;
+        $user->save();
+
+        return response()->json([
+            'message' => 'Email verified successfully.',
+            'user'    => $this->formatUser($user),
+        ]);
     }
 }
