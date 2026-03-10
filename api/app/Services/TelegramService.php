@@ -37,9 +37,15 @@ class TelegramService
 
             // If we have an image, use sendPhoto. Otherwise sendSendMessage.
             if ($post->image_url) {
+                // Ensure photo URL is absolute for Telegram
+                $photoUrl = $post->image_url;
+                if (!str_starts_with($photoUrl, 'http')) {
+                    $photoUrl = rtrim($websiteUrl, '/') . '/' . ltrim($photoUrl, '/');
+                }
+
                 $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$token}/sendPhoto", [
                     'chat_id' => $channelId,
-                    'photo'   => $post->image_url,
+                    'photo'   => $photoUrl,
                     'caption' => $caption,
                     'parse_mode' => 'HTML',
                 ]);
