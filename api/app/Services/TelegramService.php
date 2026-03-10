@@ -43,12 +43,16 @@ class TelegramService
                     $photoUrl = rtrim($websiteUrl, '/') . '/' . ltrim($photoUrl, '/');
                 }
 
-                $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$token}/sendPhoto", [
+                $payload = [
                     'chat_id' => $channelId,
                     'photo'   => $photoUrl,
                     'caption' => $caption,
                     'parse_mode' => 'HTML',
-                ]);
+                ];
+
+                Log::info('Telegram: Sending photo', ['payload' => $payload]);
+
+                $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$token}/sendPhoto", $payload);
             } else {
                 $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$token}/sendMessage", [
                     'chat_id' => $channelId,
