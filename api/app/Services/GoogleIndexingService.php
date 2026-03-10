@@ -16,7 +16,10 @@ class GoogleIndexingService
      */
     public function publishUrl($url)
     {
+        Log::info('Google Indexing: publishUrl called', ['url' => $url]);
+
         if (Setting::getValue('google_indexing_enabled') !== '1') {
+            Log::warning('Google Indexing: Skipping submission because it is disabled in settings.');
             return false;
         }
 

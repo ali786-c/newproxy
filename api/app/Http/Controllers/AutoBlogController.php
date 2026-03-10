@@ -164,6 +164,8 @@ class AutoBlogController extends Controller
      */
     public function indexPost(Request $request, \App\Services\GoogleIndexingService $indexing)
     {
+        \Illuminate\Support\Facades\Log::info('Admin Indexing Request Received', ['post_id' => $request->post_id]);
+
         $request->validate([
             'post_id' => 'required|exists:blog_posts,id'
         ]);
