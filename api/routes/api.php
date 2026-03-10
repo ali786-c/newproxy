@@ -177,6 +177,7 @@ Route::middleware(['auth:sanctum', 'role:admin', 'throttle:60,1'])->prefix('admi
     Route::post('/blog/automation/telegram-test', function(\App\Services\TelegramService $telegram) {
         return response()->json($telegram->sendTestMessage());
     });
+    Route::post('/blog/automation/google-test', [\App\Http\Controllers\AutoBlogController::class, 'testIndexing']);
 
     // Admin Products Management
     Route::get('/products',          [\App\Http\Controllers\ProductController::class, 'adminIndex']);

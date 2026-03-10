@@ -30,6 +30,9 @@ class AutoBlogController extends Controller
                 'telegram_bot_token' => Setting::getValue('telegram_bot_token') ?: '',
                 'telegram_channel_id' => Setting::getValue('telegram_channel_id') ?: '',
                 'telegram_auto_post_enabled' => Setting::getValue('telegram_auto_post_enabled', '0') === '1',
+                // Google Indexing settings
+                'google_indexing_enabled' => Setting::getValue('google_indexing_enabled', '0') === '1',
+                'google_indexing_configured' => !empty(Setting::getValue('google_indexing_json')),
             ]
         ]);
     }
@@ -87,6 +90,8 @@ class AutoBlogController extends Controller
             'telegram_bot_token' => 'nullable|string',
             'telegram_channel_id' => 'nullable|string',
             'telegram_auto_post_enabled' => 'nullable|boolean',
+            'google_indexing_enabled' => 'nullable|boolean',
+            'google_indexing_json' => 'nullable|string',
         ]);
 
         if ($request->has('gemini_api_key')) {
@@ -113,20 +118,47 @@ class AutoBlogController extends Controller
             \App\Models\Setting::updateOrCreate(['key' => 'telegram_auto_post_enabled'], ['value' => $request->telegram_auto_post_enabled ? '1' : '0']);
         }
 
+        if ($request->has('google_indexing_enabled')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'google_indexing_enabled'], ['value' => $request->google_indexing_enabled ? '1' : '0']);
+        }
+
+        if ($request->has('google_indexing_json') && !empty($request->google_indexing_json)) {
+            $encrypted = $this->encryptServiceKey($request->google_indexing_json);
+            \App\Models\Setting::updateOrCreate(['key' => 'google_indexing_json'], ['value' => $encrypted]);
+        }
+
         \App\Models\AdminLog::log(
             'update_autoblog_settings',
-            "Updated Auto-Blog Settings (including Telegram)",
+            "Updated Auto-Blog Settings (including Telegram & Indexing)",
             null,
-            $request->except(['gemini_api_key', 'telegram_bot_token']) // Don't log sensitive keys
+            $request->except(['gemini_api_key', 'telegram_bot_token', 'google_indexing_json']) // Don't log sensitive keys
         );
 
         return response()->json(['message' => 'Settings updated.']);
     }
 
     /**
+     * Admin: Test Google Indexing API.
+     */
+    public function testIndexing(Request $request, \App\Services\GoogleIndexingService $indexing)
+    {
+        $testUrl = url('/'); // Use home page as test
+        $success = $indexing->publishUrl($testUrl);
+
+        if ($success) {
+            return response()->json(['ok' => true, 'message' => 'Google Indexing connectivity verified!']);
+        }
+
+        return response()->json([
+            'ok' => false, 
+            'message' => 'Indexing test failed. Check laravel.log for details. Ensure Service Account has Owner access in Search Console.'
+        ], 500);
+    }
+
+    /**
      * Admin: Manually trigger a blog post generation.
      */
-    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram)
+    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing)
     {
         $keywordObj = null;
 
@@ -208,6 +240,9 @@ class AutoBlogController extends Controller
             // 6. Share to Telegram (Background aware service)
             $telegramShared = $telegram->sendBlogPost($post);
 
+            // 7. Notify Google Indexing API
+            $indexing->publishUrl(url('/blog/' . $post->slug));
+
             \App\Models\AdminLog::log(
                 'trigger_autoblog',
                 "Generated AI blog" . ($telegramShared ? " & Shared to Telegram" : "") . ": '{$post->title}'",
@@ -232,5 +267,35 @@ class AutoBlogController extends Controller
                 'message' => 'AI Generation Failed: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Encrypt Google Service Account JSON.
+     */
+    private function encryptServiceKey($data)
+    {
+        $key = env('GOOGLE_INDEXING_CRYPTO_KEY');
+        if (!$key) return $data;
+
+        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+        $encrypted = openssl_encrypt($data, 'aes-256-cbc', hex2bin($key), 0, $iv);
+        
+        return base64_encode($iv . $encrypted);
+    }
+
+    /**
+     * Decrypt Google Service Account JSON.
+     */
+    public function decryptServiceKey($data)
+    {
+        $key = env('GOOGLE_INDEXING_CRYPTO_KEY');
+        if (!$key || empty($data)) return null;
+
+        $decoded = base64_decode($data);
+        $ivLen = openssl_cipher_iv_length('aes-256-cbc');
+        $iv = substr($decoded, 0, $ivLen);
+        $ciphertext = substr($decoded, $ivLen);
+
+        return openssl_decrypt($ciphertext, 'aes-256-cbc', hex2bin($key), 0, $iv);
     }
 }
