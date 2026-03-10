@@ -57,24 +57,32 @@ class TelegramService
                     'parse_mode' => 'HTML',
                 ];
 
-                Log::info('Telegram: Sending photo', ['payload' => $payload]);
+                Log::info('Telegram: Attempting sendPhoto', ['payload' => $payload]);
 
-                $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$token}/sendPhoto", $payload);
-            } else {
-                $response = Http::withoutVerifying()->post("https://api.telegram.org/bot{$token}/sendMessage", [
-                    'chat_id' => $channelId,
-                    'text'    => $caption,
-                    'parse_mode' => 'HTML',
-                ]);
+                $response = Http::withoutVerifying()->timeout(15)->post("https://api.telegram.org/bot{$token}/sendPhoto", $payload);
+
+                if ($response->successful()) {
+                    Log::info("Telegram: Post successfully shared: {$post->title}");
+                    return true;
+                }
+
+                Log::warning("Telegram: sendPhoto failed, falling back to sendMessage. Error: " . $response->body());
             }
+
+            // Fallback or No Image: Send as regular message
+            $response = Http::withoutVerifying()->timeout(15)->post("https://api.telegram.org/bot{$token}/sendMessage", [
+                'chat_id' => $channelId,
+                'text'    => $caption,
+                'parse_mode' => 'HTML',
+            ]);
 
             if ($response->successful()) {
-                Log::info("Telegram: Post successfully shared: {$post->title}");
+                Log::info("Telegram: Post successfully shared via sendMessage: {$post->title}");
                 return true;
-            } else {
-                Log::error("Telegram API Error: " . $response->body());
-                return false;
             }
+
+            Log::error("Telegram API Error (Final): " . $response->body());
+            return false;
 
         } catch (\Exception $e) {
             Log::error("Telegram Service Exception: " . $e->getMessage());
