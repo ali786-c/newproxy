@@ -6,6 +6,7 @@ use App\Models\BlogPost;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class FacebookService
 {
@@ -33,7 +34,7 @@ class FacebookService
             // Ensure the blog link points to the root (no /api)
             $rootUrl = rtrim($websiteUrl, '/');
             if (str_ends_with($rootUrl, '/api')) {
-                $rootUrl = \Illuminate\Support\Str::replaceLast('/api', '', $rootUrl);
+                $rootUrl = Str::replaceLast('/api', '', $rootUrl);
             }
             $postUrl = $rootUrl . '/blog/' . $post->slug;
 

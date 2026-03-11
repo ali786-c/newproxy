@@ -6,6 +6,7 @@ use App\Models\BlogPost;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class TelegramService
 {
