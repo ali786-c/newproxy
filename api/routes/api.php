@@ -25,6 +25,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/login',  [\App\Http\Controllers\AuthController::class, 'login']);
     Route::post('/signup', [\App\Http\Controllers\AuthController::class, 'register']);
 
+    // Email Verification Link (Public - no auth needed)
+    Route::get('/verify-email-link', [\App\Http\Controllers\AuthController::class, 'verifyEmailLink'])->name('verification.verify');
+
     // Google OAuth
     Route::get('/google/redirect', [\App\Http\Controllers\GoogleAuthController::class, 'redirectToGoogle']);
     Route::get('/google/callback', [\App\Http\Controllers\GoogleAuthController::class, 'handleGoogleCallback']);
