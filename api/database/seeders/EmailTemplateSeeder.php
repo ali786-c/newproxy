@@ -311,19 +311,19 @@ HTML;
             ],
             [
                 'key' => 'email_verification',
-                'name' => 'Email Verification Code',
-                'subject' => '{{verification_code}} is your verification code',
+                'name' => 'Email Verification Link',
+                'subject' => 'Verify Your Email Address - {{app.name}}',
                 'content' => '<h2 style="margin:0 0 16px; font-size:22px; color:#0f172a; text-align:center;">Verify Your Email Address</h2>
-                             <p style="margin:0 0 24px; font-size:15px; color:#334155; line-height:1.7; text-align:center;">Thank you for joining <strong>{{app.name}}</strong>! Please use the following 6-digit code to complete your registration and verify your account.</p>
-                             <div style="background:#f0fdf4; padding:32px; border-radius:16px; text-align:center; border:2px dashed #25935f; margin-bottom:24px;">
-                                <div style="font-size:36px; font-weight:900; letter-spacing:10px; color:#25935f; margin-bottom:8px;">{{verification_code}}</div>
-                                <div style="font-size:12px; color:#166534; font-weight:600; text-transform:uppercase; letter-spacing:1px;">Expires in 15 minutes</div>
+                             <p style="margin:0 0 24px; font-size:15px; color:#334155; line-height:1.7; text-align:center;">Thank you for joining <strong>{{app.name}}</strong>! Please click the button below to verify your email address and complete your registration.</p>
+                             <div style="text-align:center; margin-bottom:30px;">
+                                <a href="{{verification_url}}" style="display:inline-block; background:#25935f; color:#ffffff; padding:14px 32px; border-radius:8px; text-decoration:none; font-weight:700; font-size:16px; box-shadow:0 4px 12px rgba(37, 147, 95, 0.2);">Verify Email Address</a>
                              </div>
-                             <p style="margin:0 0 20px; font-size:14px; color:#475569; line-height:1.6; text-align:center;">Simply enter this code on the verification screen to proceed.</p>
-                             <div style="padding-top:20px; border-top:1px solid #e2e8f0; text-align:center;">
+                             <p style="margin:0 0 20px; font-size:14px; color:#475569; line-height:1.6; text-align:center;">This link will expire in 60 minutes. If the button above doesn\'t work, copy and paste the following link into your browser:</p>
+                             <p style="word-break:break-all; font-size:12px; color:#25935f; text-align:center; background:#f8fafc; padding:12px; border-radius:6px;">{{verification_url}}</p>
+                             <div style="padding-top:20px; border-top:1px solid #e2e8f0; text-align:center; margin-top:30px;">
                                 <p style="margin:0; font-size:12px; color:#94a3b8;">If you did not request this verification, you can safely ignore this email.</p>
                              </div>',
-                'variables' => ['verification_code', 'app.name', 'year'],
+                'variables' => ['verification_url', 'app.name', 'year'],
             ],
         ];
 

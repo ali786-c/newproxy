@@ -41,7 +41,7 @@ Route::prefix('auth')->group(function () {
 // ─────────────────────────────────────────────
 // Protected Routes
 // ─────────────────────────────────────────────
-Route::middleware(['auth:sanctum', 'banned'])->group(function () {
+Route::middleware(['auth:sanctum', 'banned', 'verified'])->group(function () {
 
     // Profile & Stats
     Route::get('/profile',  [\App\Http\Controllers\AuthController::class, 'profile']);

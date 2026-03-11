@@ -71,11 +71,9 @@ class AuthController extends Controller
             ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
         );
         
-        // Adjust for SPA (Redirect through backend to frontend)
-        $backendUrl = url("/api/auth/verify-email-link") . "?" . parse_url($verificationUrl, PHP_URL_QUERY) . "&id={$user->id}&hash=" . sha1($user->getEmailForVerification());
-
+        // Adjust for SPA (Pass the signed link directly)
         try {
-            $user->notify(new \App\Notifications\EmailVerificationNotification($backendUrl));
+            $user->notify(new \App\Notifications\EmailVerificationNotification($verificationUrl));
         } catch (\Exception $e) {
             \Log::error("Registration Link Error: " . $e->getMessage());
         }
@@ -510,13 +508,9 @@ class AuthController extends Controller
             ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
         );
 
-        // Map to our custom verification handler
-        $query = parse_url($verificationUrl, PHP_URL_QUERY);
-        $backendUrl = url("/api/auth/verify-email-link") . "?" . $query . "&id={$user->id}&hash=" . sha1($user->getEmailForVerification());
-
         // Send Notification
         try {
-            $user->notify(new EmailVerificationNotification($backendUrl));
+            $user->notify(new EmailVerificationNotification($verificationUrl));
         } catch (\Exception $e) {
             \Log::error("Link Notification Error: " . $e->getMessage());
             return response()->json(['message' => 'Failed to send email. Please check your SMTP settings.'], 500);
@@ -547,11 +541,6 @@ class AuthController extends Controller
         if (!$user->hasVerifiedEmail()) {
             $user->markEmailAsVerified();
             
-            // Clear any old OTP fields if they exist
-            $user->email_verification_code = null;
-            $user->email_verification_expires_at = null;
-            $user->save();
-
             // Fire events if needed
             event(new \Illuminate\Auth\Events\Verified($user));
         }
