@@ -13,6 +13,14 @@ define('ENV_FILE',  API_PATH . '/.env');
 if (file_exists(LOCK_FILE)) {
     $uri  = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     $path = ltrim(urldecode($uri), '/');
+
+    // ─── SMART REDIRECT: Fix Verification Link (Missing /api prefix) ──────
+    if ($path === 'auth/verify-email-link') {
+        $queryString = $_SERVER['QUERY_STRING'] ? '?' . $_SERVER['QUERY_STRING'] : '';
+        header('Location: /api/' . $path . $queryString);
+        exit;
+    }
+
     $file = __DIR__ . '/' . $path;
     // Serve static assets directly
     if ($path !== '' && is_file($file)) {
