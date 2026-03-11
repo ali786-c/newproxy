@@ -40,6 +40,11 @@ Route::prefix('auth')->group(function () {
     });
 });
 
+
+// Free Trial Claim (auth required, email check inside controller)
+Route::middleware(['auth:sanctum', 'banned'])->post('/trial/claim', [\App\Http\Controllers\ProxyController::class, 'claimFreeTrial']);
+
+
 // ─────────────────────────────────────────────
 // Protected Routes
 // ─────────────────────────────────────────────

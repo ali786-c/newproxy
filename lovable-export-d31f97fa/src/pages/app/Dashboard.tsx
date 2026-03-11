@@ -3,28 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import {
-  Globe,
-  Shield,
-  Smartphone,
-  Server,
-  Layers,
-  Wifi,
-  Check,
-  ArrowRight,
-  Star,
-  BookOpen,
-  FileText,
-  DollarSign,
-  MessageSquare,
-  Wallet,
-  Activity,
-  Zap,
+  Globe, Shield, Smartphone, Server,
+  Layers, Wifi, Check, ArrowRight, Star,
+  BookOpen, FileText, DollarSign, MessageSquare,
+  Wallet, Activity, Zap, Gift, CheckCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { useUsage, useStats, useProducts } from "@/hooks/use-backend";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api/client";
+import { toast } from "@/hooks/use-toast";
+import { z } from "zod";
 
 const PRODUCTS = [
   {
@@ -145,7 +138,7 @@ export default function AppDashboard() {
   console.log("DASHBOARD RENDER - backendProducts:", backendProducts);
   console.log("DASHBOARD RENDER - backendProductsError:", backendProductsError);
 
-  const products = (backendProducts || []).map((p: any) => {
+  const products = (backendProducts || []).filter((p: any) => !p.is_trial).map((p: any) => {
     const meta = PRODUCTS.find(m => m.id === p.type) || PRODUCTS[0];
     return {
       ...meta,
@@ -154,7 +147,7 @@ export default function AppDashboard() {
       price: p.price_cents / 100,
       subtitle: p.tagline || meta.subtitle,
       features: p.features && p.features.length > 0 ? p.features : meta.features,
-      type: p.type, // Make sure we keep the type for sorting
+      type: p.type,
     };
   });
 
@@ -195,10 +188,27 @@ export default function AppDashboard() {
   const balance = user?.balance ?? 0;
   const usedMb = stats?.bandwidth_used ?? 0;
   const totalMb = stats?.bandwidth_total ?? 0;
-
   const usedGb = (usedMb / 1024).toFixed(2);
   const totalGb = (totalMb / 1024).toFixed(2);
-  const remainingGb = Math.max(0, totalMb - usedMb) / 1024;
+
+  const queryClient = useQueryClient();
+  const [trialResult, setTrialResult] = useState<any>(null);
+
+  const trialMutation = useMutation({
+    mutationFn: () => api.post('/trial/claim', z.any(), {}),
+    onSuccess: (data: any) => {
+      setTrialResult(data);
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+      toast({ title: '🎉 Free trial activated!', description: 'Your 20MB residential proxy is ready.' });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Could not claim trial',
+        description: err?.response?.data?.message || err.message || 'Please try again.',
+        variant: 'destructive'
+      });
+    }
+  });
 
   return (
     <>
@@ -223,6 +233,52 @@ export default function AppDashboard() {
             </CardContent>
           </Card>
         )}
+
+        {/* Free Trial Card — Always visible */}
+        <Card className="border-emerald-500/40 bg-gradient-to-r from-emerald-950/30 to-emerald-900/10 overflow-hidden">
+          <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-emerald-500/15 p-2.5">
+                <Gift className="h-6 w-6 text-emerald-500" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-sm">Free Trial — 20MB Residential Proxy</p>
+                  <Badge className="bg-emerald-500 text-white text-[10px]">FREE</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {user?.has_claimed_trial
+                    ? 'You have already activated your free trial. Check your proxies!'
+                    : !user?.email_verified_at
+                      ? 'Verify your email to claim 20MB of free residential bandwidth — no credit card needed.'
+                      : 'Claim 20MB of free residential bandwidth. One-time per account, no credit card needed.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="shrink-0">
+              {user?.has_claimed_trial ? (
+                <Button variant="outline" size="sm" className="border-emerald-500 text-emerald-600 gap-1.5" asChild>
+                  <Link to="/app/my-proxies/rp"><CheckCircle className="h-4 w-4" />View Trial Proxy</Link>
+                </Button>
+              ) : !user?.email_verified_at ? (
+                <Button variant="outline" size="sm" className="border-warning text-warning hover:bg-warning/10" asChild>
+                  <Link to="/app/settings?tab=verification">Verify Email First</Link>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                  onClick={() => trialMutation.mutate()}
+                  disabled={trialMutation.isPending}
+                >
+                  <Gift className="h-4 w-4" />
+                  {trialMutation.isPending ? 'Claiming...' : 'Claim Free Trial'}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Wallet & Stats Row */}
         <div className="grid gap-4 md:grid-cols-3">

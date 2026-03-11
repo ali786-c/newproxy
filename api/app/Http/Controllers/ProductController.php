@@ -23,6 +23,7 @@ class ProductController extends Controller
                     'unit'        => $product->unit,
                     'base_cost'   => (float) $product->base_cost,
                     'markup'      => (float) $product->markup,
+                    'is_trial'    => (bool) $product->is_trial,
                 ];
             });
             return response()->json($products);
@@ -44,17 +45,15 @@ class ProductController extends Controller
             'name'             => 'required|string|max:255',
             'type'             => 'required|string|in:rp,dc,mp,isp,dc_ipv6,dc_unmetered,isp_shared,isp_private,isp_virgin',
             'unit'             => 'nullable|string|in:GB,IP,Month',
-            // FIX P6: Add max price to prevent accidental extreme values.
             'price'            => 'required|numeric|min:0|max:999999',
             'base_cost'        => 'nullable|numeric|min:0',
             'markup'           => 'nullable|numeric|min:0',
             'evomi_product_id' => 'required|string|max:255|unique:products,evomi_product_id',
             'is_active'        => 'boolean',
+            'is_trial'         => 'boolean',
             'tagline'          => 'nullable|string|max:255',
-            // FIX P4: Limit number of features and length of each.
             'features'         => 'nullable|array|max:50',
             'features.*'       => 'string|max:255',
-            // FIX P5: Limit number of discount tiers.
             'volume_discounts' => 'nullable|array|max:20',
             'volume_discounts.*.min_qty' => 'required|integer|min:1',
             'volume_discounts.*.price'   => 'required|numeric|min:0',
@@ -80,17 +79,15 @@ class ProductController extends Controller
             'name'             => 'sometimes|required|string|max:255',
             'type'             => 'sometimes|required|string|in:rp,dc,mp,isp,dc_ipv6,dc_unmetered,isp_shared,isp_private,isp_virgin',
             'unit'             => 'nullable|string|in:GB,IP,Month',
-            // FIX P6: Add max price to prevent accidental extreme values.
             'price'            => 'sometimes|required|numeric|min:0|max:999999',
             'base_cost'        => 'nullable|numeric|min:0',
             'markup'           => 'nullable|numeric|min:0',
             'evomi_product_id' => 'sometimes|required|string|max:255|unique:products,evomi_product_id,' . $id,
             'is_active'        => 'sometimes|boolean',
+            'is_trial'         => 'sometimes|boolean',
             'tagline'          => 'nullable|string|max:255',
-            // FIX P4: Limit number of features and length of each.
             'features'         => 'nullable|array|max:50',
             'features.*'       => 'string|max:255',
-            // FIX P5: Limit number of discount tiers.
             'volume_discounts' => 'nullable|array|max:20',
             'volume_discounts.*.min_qty' => 'required|integer|min:1',
             'volume_discounts.*.price'   => 'required|numeric|min:0',

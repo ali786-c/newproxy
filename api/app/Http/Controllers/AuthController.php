@@ -238,8 +238,21 @@ class AuthController extends Controller
      */
     public function me(Request $request)
     {
-        return response()->json($this->formatUser($request->user()));
+        $user = $request->user();
+        return response()->json([
+            'id'                 => (string) $user->id,
+            'name'               => $user->name,
+            'email'              => $user->email,
+            'role'               => $user->role,
+            'balance'            => (float) $user->balance,
+            'referral_code'      => $user->referral_code,
+            'avatar'             => $user->avatar,
+            'email_verified_at'  => $user->email_verified_at,
+            'has_claimed_trial'  => (bool) $user->has_claimed_trial,
+            'created_at'         => $user->created_at,
+        ]);
     }
+
 
     /**
      * Logout user.

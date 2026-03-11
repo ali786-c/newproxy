@@ -418,4 +418,123 @@ class ProxyController extends Controller
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Claim Free Trial — 20MB Residential.
+     * POST /trial/claim
+     * Requires auth:sanctum. Email verified check inside.
+     */
+    public function claimFreeTrial(Request $request)
+    {
+        $user = $request->user()->fresh();
+
+        // Already claimed?
+        if ($user->has_claimed_trial) {
+            return response()->json([
+                'message' => 'You have already claimed your free trial.',
+                'code'    => 'trial_already_claimed',
+            ], 409);
+        }
+
+        // Email verified?
+        if (!$user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'You must verify your email address before claiming the free trial.',
+                'code'    => 'email_not_verified',
+            ], 403);
+        }
+
+        // Find active trial product
+        $product = Product::where('is_trial', true)->where('is_active', true)->first();
+
+        if (!$product) {
+            return response()->json(['message' => 'Free trial is not available at this time.'], 404);
+        }
+
+        $trialMb = 20; // 20 MB
+
+        try {
+            // Step 1: Create pending order
+            $order = Order::create([
+                'user_id'         => $user->id,
+                'product_id'      => $product->id,
+                'status'          => 'pending',
+                'bandwidth_total' => $trialMb,
+                'expires_at'      => now()->addDays(7),
+            ]);
+
+            // Step 2: Ensure Evomi subuser for this order
+            $subuserResult = $this->evomi->ensureOrderSubuser($order);
+
+            if (!$subuserResult['success']) {
+                $order->update(['status' => 'failed']);
+                return response()->json(['message' => 'Failed to provision trial. Please try again later.'], 503);
+            }
+
+            $order    = $order->fresh();
+            $userKeys = $order->evomi_keys ?? [];
+            $proxyKey = $userKeys['rp'] ?? ($userKeys['residential'] ?? null);
+
+            if (!$proxyKey) {
+                $order->update(['status' => 'failed']);
+                return response()->json(['message' => 'Failed to get proxy credentials. Please try again.'], 503);
+            }
+
+            // Step 3: Allocate 20MB on Evomi (no billing)
+            $evomiResult = $this->evomi->allocateBandwidth($order->evomi_username, $trialMb, 'rp');
+
+            if (!$evomiResult) {
+                $order->update(['status' => 'failed']);
+                return response()->json(['message' => 'Failed to allocate trial bandwidth.'], 503);
+            }
+
+            // Step 4: Mark claimed + save proxy (no balance deduction)
+            $proxy = DB::transaction(function () use ($user, $proxyKey, $order) {
+                $user->has_claimed_trial = true;
+                $user->trial_claim_ip    = request()->ip();
+                $user->save();
+
+                $order->update(['status' => 'active']);
+
+                return Proxy::create([
+                    'order_id' => $order->id,
+                    'host'     => 'proxy.upgraderproxy.com',
+                    'port'     => 1000,
+                    'username' => $order->evomi_username,
+                    'password' => "{$proxyKey}_country-US_session-rotating",
+                    'country'  => 'US',
+                ]);
+            });
+
+            // Notify user
+            try {
+                \Illuminate\Support\Facades\Notification::route('mail', $user->email)
+                    ->notify(new \App\Notifications\GenericDynamicNotification('proxy_created_user', [
+                        'user'       => ['name' => $user->name],
+                        'product'    => ['name' => 'Free Trial — 20MB Residential'],
+                        'order'      => ['id' => $order->id],
+                        'action_url' => url('/app/my-proxies/rp'),
+                        'year'       => date('Y'),
+                    ]));
+            } catch (\Exception $e) {
+                Log::warning('FreeTrial email notification failed: ' . $e->getMessage());
+            }
+
+            return response()->json([
+                'message'    => 'Free trial claimed! Enjoy your 20MB of residential bandwidth.',
+                'trial_mb'   => $trialMb,
+                'expires_at' => $order->expires_at,
+                'proxy'      => [
+                    'host'     => $proxy->host,
+                    'port'     => (int) $proxy->port,
+                    'username' => $proxy->username,
+                    'password' => $proxy->password,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('FreeTrial Claim Error: ' . $e->getMessage());
+            return response()->json(['message' => 'An unexpected error occurred.'], 500);
+        }
+    }
 }

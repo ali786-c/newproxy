@@ -40,6 +40,7 @@ const ProductSchema = z.object({
   type: z.string(),
   price: z.coerce.number(),
   is_active: z.coerce.number().or(z.boolean()).optional().default(true),
+  is_trial: z.coerce.boolean().optional().default(false),
   evomi_product_id: z.string().nullable().optional(),
   tagline: z.string().nullable().optional(),
   features: z.array(z.string()).nullable().optional(),
@@ -79,6 +80,7 @@ type FormData = {
   base_cost_eur: string;
   markup_pct: string;
   is_active: boolean;
+  is_trial: boolean;
   evomi_product_id: string;
   tagline: string;
   features: string[];
@@ -92,6 +94,7 @@ const EMPTY_FORM: FormData = {
   base_cost_eur: "",
   markup_pct: "0",
   is_active: true,
+  is_trial: false,
   evomi_product_id: "",
   tagline: "",
   features: [],
@@ -182,6 +185,7 @@ export default function AdminProducts() {
       base_cost_eur: String(p.base_cost_eur),
       markup_pct: String(p.markup_pct),
       is_active: p.is_active,
+      is_trial: p.is_trial || false,
       evomi_product_id: p.evomi_product_id || "",
       tagline: p.tagline || "",
       features: p.features || [],
@@ -212,15 +216,16 @@ export default function AdminProducts() {
     mutation.mutate({
       name: form.name.trim(),
       type: form.proxy_type,
-      price: price,
+      price: form.is_trial ? 0 : price,
       is_active: form.is_active,
+      is_trial: form.is_trial,
       evomi_product_id: form.evomi_product_id.trim(),
       tagline: form.tagline.trim(),
       unit: form.unit,
-      base_cost: parseFloat(form.base_cost_eur),
-      markup: parseFloat(form.markup_pct),
+      base_cost: form.is_trial ? 0 : parseFloat(form.base_cost_eur),
+      markup: form.is_trial ? 0 : parseFloat(form.markup_pct),
       features: form.features.filter(f => f.trim() !== ""),
-      volume_discounts: form.volume_discounts.length > 0 ? form.volume_discounts : null
+      volume_discounts: (!form.is_trial && form.volume_discounts.length > 0) ? form.volume_discounts : null
     });
   };
 
@@ -257,12 +262,21 @@ export default function AdminProducts() {
               <TableBody>
                 {products?.map((p: any) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {p.name}
+                        {p.is_trial && (
+                          <Badge variant="outline" className="text-xs border-emerald-500 text-emerald-600 bg-emerald-50">
+                            Free Trial
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="capitalize">{p.proxy_type}</TableCell>
                     <TableCell>per {p.unit}</TableCell>
-                    <TableCell className="text-right">€{p.base_cost_eur.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{p.markup_pct}%</TableCell>
-                    <TableCell className="text-right font-semibold">€{p.sell_price_eur.toFixed(2)}/{p.unit}</TableCell>
+                    <TableCell className="text-right">{p.is_trial ? '—' : `€${p.base_cost_eur.toFixed(2)}`}</TableCell>
+                    <TableCell className="text-right">{p.is_trial ? '—' : `${p.markup_pct}%`}</TableCell>
+                    <TableCell className="text-right font-semibold">{p.is_trial ? <span className="text-emerald-600 font-bold">FREE</span> : `€${p.sell_price_eur.toFixed(2)}/${p.unit}`}</TableCell>
                     <TableCell>
                       <Badge variant={p.is_active ? "default" : "secondary"}>
                         {p.is_active ? "Active" : "Inactive"}
@@ -495,6 +509,10 @@ export default function AdminProducts() {
                   </Button>
                 </div>
               ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.is_trial} onCheckedChange={(v) => setForm({ ...form, is_trial: v, base_cost_eur: v ? "0" : form.base_cost_eur, markup_pct: v ? "0" : form.markup_pct })} />
+              <Label>Is Free Trial Product <span className="text-xs text-muted-foreground">(price locked to €0, no billing)</span></Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
