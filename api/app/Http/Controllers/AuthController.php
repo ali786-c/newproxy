@@ -88,13 +88,15 @@ class AuthController extends Controller
             ]));
 
             // Admin Alert
+            $rootUrl = str_replace('/api', '', rtrim(config('app.url'), '/'));
             \Illuminate\Support\Facades\Notification::route('mail', \App\Models\Setting::getValue('admin_notification_email'))
                 ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_user', [
                     'user' => [
                         'name' => $user->name,
                         'email' => $user->email,
-                        'signup_ip' => $user->signup_ip
+                        'ip' => $user->signup_ip
                     ],
+                    'admin_url' => $rootUrl . '/admin/users/' . $user->id,
                     'year' => date('Y')
                 ]));
         } catch (\Exception $e) {
