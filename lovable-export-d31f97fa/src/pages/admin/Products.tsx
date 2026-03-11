@@ -41,6 +41,7 @@ const ProductSchema = z.object({
   price: z.coerce.number(),
   is_active: z.coerce.number().or(z.boolean()).optional().default(true),
   is_trial: z.coerce.boolean().optional().default(false),
+  sort_order: z.coerce.number().optional().default(0),
   evomi_product_id: z.string().nullable().optional(),
   tagline: z.string().nullable().optional(),
   features: z.array(z.string()).nullable().optional(),
@@ -81,6 +82,7 @@ type FormData = {
   markup_pct: string;
   is_active: boolean;
   is_trial: boolean;
+  sort_order: string;
   evomi_product_id: string;
   tagline: string;
   features: string[];
@@ -95,6 +97,7 @@ const EMPTY_FORM: FormData = {
   markup_pct: "0",
   is_active: true,
   is_trial: false,
+  sort_order: "0",
   evomi_product_id: "",
   tagline: "",
   features: [],
@@ -124,6 +127,8 @@ export default function AdminProducts() {
           markup_pct: Number(p.markup || 0),
           sell_price_eur: Number(p.price),
           is_active: Boolean(p.is_active),
+          is_trial: Boolean(p.is_trial),
+          sort_order: p.sort_order ?? 0,
           evomi_product_id: p.evomi_product_id,
           tagline: p.tagline || "",
           features: p.features || [],
@@ -186,6 +191,7 @@ export default function AdminProducts() {
       markup_pct: String(p.markup_pct),
       is_active: p.is_active,
       is_trial: p.is_trial || false,
+      sort_order: String(p.sort_order ?? 0),
       evomi_product_id: p.evomi_product_id || "",
       tagline: p.tagline || "",
       features: p.features || [],
@@ -219,6 +225,7 @@ export default function AdminProducts() {
       price: form.is_trial ? 0 : price,
       is_active: form.is_active,
       is_trial: form.is_trial,
+      sort_order: parseInt(form.sort_order) || 0,
       evomi_product_id: form.evomi_product_id.trim(),
       tagline: form.tagline.trim(),
       unit: form.unit,
@@ -281,6 +288,9 @@ export default function AdminProducts() {
                       <Badge variant={p.is_active ? "default" : "secondary"}>
                         {p.is_active ? "Active" : "Inactive"}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{p.sort_order ?? 0}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
@@ -514,6 +524,18 @@ export default function AdminProducts() {
               <Switch checked={form.is_trial} onCheckedChange={(v) => setForm({ ...form, is_trial: v, base_cost_eur: v ? "0" : form.base_cost_eur, markup_pct: v ? "0" : form.markup_pct })} />
               <Label>Is Free Trial Product <span className="text-xs text-muted-foreground">(price locked to €0, no billing)</span></Label>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sort_order">Sort Order (Lower shows first)</Label>
+              <Input
+                id="sort_order"
+                type="number"
+                value={form.sort_order}
+                onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+                placeholder="0"
+              />
+            </div>
+
             <div className="flex items-center gap-2">
               <Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} />
               <Label>Active</Label>

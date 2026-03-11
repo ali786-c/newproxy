@@ -24,6 +24,7 @@ class ProductController extends Controller
                     'base_cost'   => (float) $product->base_cost,
                     'markup'      => (float) $product->markup,
                     'is_trial'    => (bool) $product->is_trial,
+                    'sort_order'  => (int) $product->sort_order,
                 ];
             });
             return response()->json($products);
@@ -51,6 +52,7 @@ class ProductController extends Controller
             'evomi_product_id' => 'required|string|max:255|unique:products,evomi_product_id',
             'is_active'        => 'boolean',
             'is_trial'         => 'boolean',
+            'sort_order'       => 'nullable|integer',
             'tagline'          => 'nullable|string|max:255',
             'features'         => 'nullable|array|max:50',
             'features.*'       => 'string|max:255',
@@ -85,6 +87,7 @@ class ProductController extends Controller
             'evomi_product_id' => 'sometimes|required|string|max:255|unique:products,evomi_product_id,' . $id,
             'is_active'        => 'sometimes|boolean',
             'is_trial'         => 'sometimes|boolean',
+            'sort_order'       => 'nullable|integer',
             'tagline'          => 'nullable|string|max:255',
             'features'         => 'nullable|array|max:50',
             'features.*'       => 'string|max:255',

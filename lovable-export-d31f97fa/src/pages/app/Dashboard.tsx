@@ -156,9 +156,15 @@ export default function AppDashboard() {
   let bottomProducts: any[] = [];
 
   if (products.length > 0) {
-    // Separate Residential vs others
-    const rpProducts = products.filter((p: any) => p.type === 'rp').sort((a: any, b: any) => a.price - b.price);
-    const nonRpProducts = products.filter((p: any) => p.type !== 'rp');
+    // Primary sort by sort_order (ASC), then by price
+    const sortedProducts = [...products].sort((a, b) => {
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return a.price - b.price;
+    });
+
+    // Separate Residential vs others (if they are for top section)
+    const rpProducts = sortedProducts.filter((p: any) => p.type === 'rp');
+    const nonRpProducts = sortedProducts.filter((p: any) => p.type !== 'rp');
 
     if (rpProducts.length >= 2) {
       topProducts = [rpProducts[0], rpProducts[1]];
