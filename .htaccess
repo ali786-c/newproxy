@@ -17,7 +17,12 @@ ErrorDocument 404 /index.php
     RewriteCond %{REQUEST_URI} ^/api [NC]
     RewriteRule ^ - [L]
 
-    # Explicit 404 for missing assets (prevents MIME mismatch errors)
+    # Stop 404 falling back to index.php for actual assets
+    RewriteCond %{REQUEST_URI} \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|webmanifest)$ [NC]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ - [R=404,L]
+
+    # Explicit 404 for missing assets in /assets/ folder
     RewriteCond %{REQUEST_URI} ^/assets/ [NC]
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ - [R=404,L]
