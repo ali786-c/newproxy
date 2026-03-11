@@ -17,6 +17,19 @@ import { AppShell } from "@/components/layout/AppShell";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import NotFound from "./pages/NotFound";
 
+/**
+ * Failsafe for Service Worker / SPA interception.
+ * If a request to /api or /storage hits this React app, 
+ * we force a hard reload to ensure the server handles it.
+ */
+const ApiLinkFixer = () => {
+  useEffect(() => {
+    console.log("API/Storage route detected in SPA. Forcing server-side reload...");
+    window.location.href = window.location.href;
+  }, []);
+  return <div className="flex h-screen items-center justify-center bg-[#0a0a14] text-white">Redirecting to server...</div>;
+};
+
 // Public pages
 const Landing = lazy(() => import("./pages/Landing"));
 const Pricing = lazy(() => import("./pages/Pricing"));
@@ -126,6 +139,10 @@ function App() {
                       <Suspense fallback={<Loading />}>
                         <ErrorBoundary>
                           <Routes>
+                            {/* Failsafe for backend routes */}
+                            <Route path="/api/*" element={<ApiLinkFixer />} />
+                            <Route path="/storage/*" element={<ApiLinkFixer />} />
+
                             {/* Public marketing pages */}
                             <Route element={<PublicLayout />}>
                               <Route path="/" element={<Landing />} />
