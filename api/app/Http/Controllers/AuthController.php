@@ -64,12 +64,11 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
         
-        // --- NEW: Email Verification Link ---
-        $verificationUrl = URL::temporarySignedRoute(
-            'verification.verify',
-            now()->addMinutes(60),
-            ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
-        );
+        // --- Email Verification Link ---
+        // Uses manual URL construction to avoid /api/api double-prefix issue.
+        // APP_URL=https://upgraderproxy.com/api causes URL::temporarySignedRoute to
+        // generate .../api/api/auth/... which is wrong. We build it ourselves.
+        $verificationUrl = $this->buildVerificationUrl($user);
         
         try {
             $user->notify(new \App\Notifications\EmailVerificationNotification($verificationUrl));
@@ -502,11 +501,8 @@ class AuthController extends Controller
         }
 
         // Generate Signed Link
-        $verificationUrl = URL::temporarySignedRoute(
-            'verification.verify',
-            now()->addMinutes(60),
-            ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
-        );
+        $verificationUrl = $this->buildVerificationUrl($user);
+
 
         // Send Notification
         try {
@@ -529,7 +525,24 @@ class AuthController extends Controller
      */
     public function verifyEmailLink(Request $request)
     {
-        if (!$request->hasValidSignature()) {
+        // Validate expiry
+        if (!$request->expires || now()->timestamp > (int) $request->expires) {
+            return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=false&error=link_expired');
+        }
+
+        // Reconstruct the URL that was signed (must match buildVerificationUrl exactly)
+        $baseUrl = rtrim(env('APP_URL', url('/')), '/');
+        $path    = '/auth/verify-email-link';
+        $params  = http_build_query([
+            'expires' => $request->expires,
+            'hash'    => $request->hash,
+            'id'      => $request->id,
+        ]);
+        $urlToSign = $baseUrl . $path . '?' . $params;
+
+        // Verify the HMAC signature
+        $expectedSignature = hash_hmac('sha256', $urlToSign, config('app.key'));
+        if (!hash_equals($expectedSignature, (string) $request->signature)) {
             return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=false&error=invalid_signature');
         }
 
@@ -541,11 +554,45 @@ class AuthController extends Controller
 
         if (!$user->hasVerifiedEmail()) {
             $user->markEmailAsVerified();
-            
-            // Fire events if needed
             event(new \Illuminate\Auth\Events\Verified($user));
         }
 
         return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=true');
+
+    }
+
+    /**
+     * Build a correctly-signed verification URL.
+     *
+     * Laravel's URL::temporarySignedRoute() uses APP_URL as its base.
+     * Because APP_URL = https://upgraderproxy.com/api, and api.php routes
+     * already get an /api prefix, it generates .../api/api/auth/... (double).
+     *
+     * This method builds the URL manually using the raw APP_URL base so
+     * the path is correctly: https://upgraderproxy.com/api/auth/verify-email-link
+     */
+    private function buildVerificationUrl(User $user): string
+    {
+        $expires   = now()->addMinutes(60)->timestamp;
+        $id        = $user->id;
+        $hash      = sha1($user->getEmailForVerification());
+
+        // Base URL = APP_URL (https://upgraderproxy.com/api) + the route path as seen by Apache
+        $baseUrl   = rtrim(env('APP_URL', url('/')), '/');
+        $path      = '/auth/verify-email-link';
+
+        // Build query string WITHOUT signature first
+        $params = http_build_query([
+            'expires'   => $expires,
+            'hash'      => $hash,
+            'id'        => $id,
+        ]);
+
+        $urlToSign = $baseUrl . $path . '?' . $params;
+
+        // Generate HMAC signature using app key (same as Laravel's signed URL)
+        $signature = hash_hmac('sha256', $urlToSign, config('app.key'));
+
+        return $urlToSign . '&signature=' . $signature;
     }
 }
