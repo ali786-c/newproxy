@@ -33,7 +33,6 @@ Route::prefix('auth')->group(function () {
         Route::get('/me',      [\App\Http\Controllers\AuthController::class, 'me']);
         Route::post('/logout', [\App\Http\Controllers\AuthController::class, 'logout']);
         Route::post('/resend-verification', [\App\Http\Controllers\AuthController::class, 'resendVerification']);
-        Route::get('/verify-email-link',   [\App\Http\Controllers\AuthController::class, 'verifyEmailLink'])->name('verification.verify')->withoutMiddleware(['auth:sanctum']);
         Route::post('/2fa/verify', [\App\Http\Controllers\AuthController::class, 'verify2fa'])->withoutMiddleware(['auth:sanctum']);
     });
 });

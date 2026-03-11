@@ -71,7 +71,6 @@ class AuthController extends Controller
             ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
         );
         
-        // Adjust for SPA (Pass the signed link directly)
         try {
             $user->notify(new \App\Notifications\EmailVerificationNotification($verificationUrl));
         } catch (\Exception $e) {
