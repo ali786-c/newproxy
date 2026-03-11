@@ -71,6 +71,11 @@ class AuthController extends Controller
             ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
         );
         
+        // Force /api prefix if missing (Subfolder hosting fix)
+        if (!str_contains($verificationUrl, '/api/')) {
+            $verificationUrl = str_replace(url('/'), url('/') . '/api', $verificationUrl);
+        }
+        
         try {
             $user->notify(new \App\Notifications\EmailVerificationNotification($verificationUrl));
         } catch (\Exception $e) {

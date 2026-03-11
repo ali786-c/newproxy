@@ -7,5 +7,4 @@ $kernel->bootstrap();
 
 echo "APP_URL: " . env('APP_URL') . "\n";
 echo "url('/test'): " . url('/test') . "\n";
-echo "url('test'): " . url('test') . "\n";
-echo "url('/api/test'): " . url('/api/test') . "\n";
+echo "route('verification.verify', ['id' => 1, 'hash' => 'test']): " . route('verification.verify', ['id' => 1, 'hash' => 'test']) . "\n";
