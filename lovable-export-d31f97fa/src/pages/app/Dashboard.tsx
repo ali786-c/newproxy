@@ -265,7 +265,7 @@ export default function AppDashboard() {
             <div className="shrink-0">
               {user?.has_claimed_trial ? (
                 <Button variant="outline" size="sm" className="border-emerald-500 text-emerald-600 gap-1.5" asChild>
-                  <Link to="/app/my-proxies/rp"><CheckCircle className="h-4 w-4" />View Trial Proxy</Link>
+                  <Link to="/app/proxies/residential"><CheckCircle className="h-4 w-4" />View Trial Proxy</Link>
                 </Button>
               ) : !user?.email_verified_at ? (
                 <Button variant="outline" size="sm" className="border-warning text-warning hover:bg-warning/10" asChild>
