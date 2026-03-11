@@ -24,6 +24,7 @@ if (file_exists(LOCK_FILE)) {
         if (isset($types[$ext])) header('Content-Type: ' . $types[$ext]);
         readfile($file); exit;
     }
+
     // All React routes → index.html
     header('Content-Type: text/html; charset=utf-8');
     readfile(__DIR__ . '/index.html');
