@@ -24,6 +24,7 @@ interface AuthContextValue extends AuthState {
   handleGoogleCallback: (code: string) => Promise<any>;
   logout: () => Promise<void>;
   clearError: () => void;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   is2FAPending: boolean;
 }
@@ -211,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         handleGoogleCallback,
         logout,
         clearError,
+        refreshUser: loadUser,
         isAuthenticated: !!state.user,
         is2FAPending: state.is2FAPending,
       }}

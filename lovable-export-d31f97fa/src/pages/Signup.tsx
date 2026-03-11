@@ -44,8 +44,8 @@ export default function Signup() {
     setSubmitting(true);
     try {
       await signup(data);
-      setEmailSent(true);
-      toast("Verification email sent", { description: "Please check your inbox to verify your email address." });
+      toast.success("Account created successfully!");
+      navigate("/app");
     } catch {
       // error is set in context
     } finally {
@@ -66,26 +66,6 @@ export default function Signup() {
       toast.error(err.message || "An error occurred during Google login.");
     }
   };
-
-  if (emailSent) {
-    return (
-      <>
-        <SEOHead title="Verify Email" noindex />
-        <div className="flex min-h-screen items-center justify-center px-4">
-          <div className="w-full max-w-sm space-y-4 rounded-lg border bg-card p-8 text-center">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
-            <h1 className="text-2xl font-bold">Check Your Email</h1>
-            <p className="text-sm text-muted-foreground">
-              We've sent a verification link to your email. Click the link to activate your account.
-            </p>
-            <Button variant="outline" className="w-full" onClick={() => navigate("/login")}>
-              Go to Login
-            </Button>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Cache;
 use App\Services\EvomiService;
 use PragmaRX\Google2FALaravel\Facade as Google2FA;
 use App\Notifications\EmailVerificationNotification;
+use Illuminate\Support\Facades\URL;
 
 class AuthController extends Controller
 {
@@ -63,16 +64,20 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
         
-        // --- NEW: Email Verification OTP ---
-        $code = (string) random_int(100000, 999999);
-        $user->email_verification_code = $code;
-        $user->email_verification_expires_at = now()->addMinutes(15);
-        $user->save();
+        // --- NEW: Email Verification Link ---
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(60),
+            ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
+        );
+        
+        // Adjust for SPA (Redirect through backend to frontend)
+        $backendUrl = url("/api/auth/verify-email-link") . "?" . parse_url($verificationUrl, PHP_URL_QUERY) . "&id={$user->id}&hash=" . sha1($user->getEmailForVerification());
 
         try {
-            $user->notify(new \App\Notifications\EmailVerificationNotification($code));
+            $user->notify(new \App\Notifications\EmailVerificationNotification($backendUrl));
         } catch (\Exception $e) {
-            \Log::error("Registration OTP Error: " . $e->getMessage());
+            \Log::error("Registration Link Error: " . $e->getMessage());
         }
         // ------------------------------------
 
@@ -476,7 +481,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Resend verification code.
+     * Resend verification link.
      * POST /auth/resend-verification
      */
     public function resendVerification(Request $request)
@@ -488,68 +493,69 @@ class AuthController extends Controller
         }
 
         // Throttle check: 60 seconds cooldown
-        $cacheKey = "resend_otp_cooldown_{$user->id}";
+        $cacheKey = "resend_link_cooldown_{$user->id}";
         if (Cache::has($cacheKey)) {
             $seconds = Cache::get($cacheKey) - time();
             if ($seconds > 0) {
                 return response()->json([
-                    'message' => "Please wait {$seconds} seconds before requesting a new code."
+                    'message' => "Please wait {$seconds} seconds before requesting a new link."
                 ], 429);
             }
         }
 
-        // Generate Code
-        $code = (string) random_int(100000, 999999);
-        $user->email_verification_code = $code;
-        $user->email_verification_expires_at = now()->addMinutes(15);
-        $user->save();
+        // Generate Signed Link
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(60),
+            ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
+        );
+
+        // Map to our custom verification handler
+        $query = parse_url($verificationUrl, PHP_URL_QUERY);
+        $backendUrl = url("/api/auth/verify-email-link") . "?" . $query . "&id={$user->id}&hash=" . sha1($user->getEmailForVerification());
 
         // Send Notification
         try {
-            $user->notify(new EmailVerificationNotification($code));
+            $user->notify(new EmailVerificationNotification($backendUrl));
         } catch (\Exception $e) {
-            \Log::error("OTP Notification Error: " . $e->getMessage());
+            \Log::error("Link Notification Error: " . $e->getMessage());
             return response()->json(['message' => 'Failed to send email. Please check your SMTP settings.'], 500);
         }
 
-        // Set Cooldown (using absolute time to calculate remaining seconds easily)
+        // Set Cooldown
         Cache::put($cacheKey, time() + 60, 60);
 
-        return response()->json(['message' => 'Verification code sent to your email.']);
+        return response()->json(['message' => 'Verification link sent to your email.']);
     }
 
     /**
-     * Verify email with OTP.
-     * POST /auth/verify-email
+     * Verify email via Magic Link.
+     * GET /auth/verify-email-link
      */
-    public function verifyEmail(Request $request)
+    public function verifyEmailLink(Request $request)
     {
-        $request->validate([
-            'code' => 'required|string|size:6',
-        ]);
-
-        $user = $request->user();
-
-        if ($user->email_verified_at) {
-            return response()->json(['message' => 'Email already verified.'], 400);
+        if (!$request->hasValidSignature()) {
+            return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=false&error=invalid_signature');
         }
 
-        if (!$user->email_verification_code || $user->email_verification_code !== $request->code) {
-            return response()->json(['message' => 'Invalid verification code.'], 422);
+        $user = User::findOrFail($request->id);
+
+        if (!hash_equals((string) $request->hash, sha1($user->getEmailForVerification()))) {
+             return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=false&error=invalid_hash');
         }
 
-        if ($user->email_verification_expires_at && now()->isAfter($user->email_verification_expires_at)) {
-            return response()->json(['message' => 'Verification code has expired.'], 422);
+        if (!$user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            
+            // Clear any old OTP fields if they exist
+            $user->email_verification_code = null;
+            $user->email_verification_expires_at = null;
+            $user->save();
+
+            // Fire events if needed
+            event(new \Illuminate\Auth\Events\Verified($user));
         }
 
-        $user->email_verified_at = now();
-        $user->email_verification_code = null;
-        $user->email_verification_expires_at = null;
-        $user->save();
-
-        return response()->json([
-            'message' => 'Email verified successfully.',
-            'user'    => $this->formatUser($user),
-        ]);
+        return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=true');
     }
 }

@@ -205,6 +205,25 @@ export default function AppDashboard() {
       <SEOHead title="Dashboard" noindex />
 
       <div className="space-y-6">
+        {!user?.email_verified_at && (
+          <Card className="border-warning bg-warning/5 overflow-hidden">
+            <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-full bg-warning/10 p-2">
+                  <Shield className="h-5 w-5 text-warning" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Verify your email address</p>
+                  <p className="text-xs text-muted-foreground">Verification is required to claim your free trial and unlock all features.</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="border-warning text-warning hover:bg-warning/10" asChild>
+                <Link to="/app/settings?tab=verification">Verify Now</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Wallet & Stats Row */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card className="bg-primary/5 border-primary/20">

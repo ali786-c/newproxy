@@ -10,6 +10,8 @@ export const UserSchema = z.object({
   referral_code: z.string().nullable().optional(),
   avatar: z.string().nullable().optional(),
   is_2fa_enabled: z.boolean().default(false),
+  email_verified_at: z.string().nullable().optional(),
+  has_claimed_trial: z.boolean().default(false),
 });
 
 export type User = z.infer<typeof UserSchema>;

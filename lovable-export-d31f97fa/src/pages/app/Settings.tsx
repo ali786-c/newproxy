@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SEOHead } from "@/components/seo/SEOHead";
 import { ErrorBanner } from "@/components/shared/ErrorBanner";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -19,25 +20,65 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, Key, Shield, Copy, Loader2 } from "lucide-react";
+import { Plus, Trash2, Key, Shield, Copy, Loader2, Check } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { clientApi, type AllowlistEntry, type ApiKey } from "@/lib/api/dashboard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Mock data removed. Using useQuery.
 
 export default function AppSettings() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const defaultTab = searchParams.get("tab") || "allowlist";
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const { user, refreshUser } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Handle verification results from URL
+  useEffect(() => {
+    const verified = searchParams.get("verified");
+    const error = searchParams.get("error");
+
+    if (verified === "true") {
+      toast({ title: "Email Verified!", description: "Your account has been successfully verified." });
+      refreshUser();
+      queryClient.invalidateQueries({ queryKey: ["user"] });
+      // Clean up URL
+      searchParams.delete("verified");
+      setSearchParams(searchParams);
+    } else if (verified === "false") {
+      toast({
+        title: "Verification Failed",
+        description: error === "invalid_signature" ? "The link has expired or is invalid." : "There was an error verifying your email.",
+        variant: "destructive"
+      });
+      searchParams.delete("verified");
+      searchParams.delete("error");
+      setSearchParams(searchParams);
+    }
+  }, [searchParams, setSearchParams, refreshUser, queryClient]);
+
+  // Sync tab with URL param if it changes
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab) setActiveTab(tab);
+  }, [searchParams]);
+
   return (
     <>
       <SEOHead title="Settings" noindex />
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Settings</h1>
-        <Tabs defaultValue="allowlist">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="allowlist">
               <Shield className="mr-1 h-3.5 w-3.5" /> IP Allowlist
             </TabsTrigger>
             <TabsTrigger value="api-keys">
               <Key className="mr-1 h-3.5 w-3.5" /> API Keys
+            </TabsTrigger>
+            <TabsTrigger value="verification">
+              <Shield className="mr-1 h-3.5 w-3.5" /> Verification
             </TabsTrigger>
           </TabsList>
 
@@ -46,6 +87,9 @@ export default function AppSettings() {
           </TabsContent>
           <TabsContent value="api-keys" className="mt-4">
             <ApiKeysPanel />
+          </TabsContent>
+          <TabsContent value="verification" className="mt-4">
+            <VerificationPanel />
           </TabsContent>
         </Tabs>
       </div>
@@ -339,5 +383,86 @@ function ApiKeysPanel() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ── Verification Panel ────────────────────────────────
+
+function VerificationPanel() {
+  const { user, refreshUser } = useAuth();
+  const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  // Handle countdown
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
+  const onResend = async () => {
+    setResending(true);
+    try {
+      await clientApi.resendVerification();
+      toast({ title: "Code Sent", description: "Please check your inbox." });
+      setCooldown(60);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const isVerified = !!user?.email_verified_at;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Shield className={`h-5 w-5 ${isVerified ? "text-success" : "text-warning"}`} />
+          Account Verification
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isVerified ? (
+          <div className="flex flex-col items-center gap-3 py-6">
+            <div className="rounded-full bg-success/10 p-3">
+              <Check className="h-8 w-8 text-success" />
+            </div>
+            <p className="font-medium">Your account is verified.</p>
+            <p className="text-sm text-muted-foreground text-center max-w-sm">
+              Thank you for verifying your email. You now have full access to our premium proxy services and free trial.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Email Verification Required</p>
+                <p className="text-sm text-muted-foreground">
+                  Your account is not verified. Please click the button below to receive a secure verification link at <strong>{user?.email}</strong>.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <Button
+                  onClick={onResend}
+                  disabled={resending || cooldown > 0}
+                  className="px-8"
+                >
+                  {resending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Shield className="mr-2 h-4 w-4" />
+                  )}
+                  {cooldown > 0 ? `Resend Link in ${cooldown}s` : "Send Verification Link"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

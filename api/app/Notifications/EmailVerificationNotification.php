@@ -7,12 +7,12 @@ class EmailVerificationNotification extends BaseDynamicNotification
     /**
      * EmailVerificationNotification constructor.
      * 
-     * @param string $code The 6-digit verification code.
+     * @param string $url The signed verification URL.
      */
-    public function __construct(string $code)
+    public function __construct(string $url)
     {
         parent::__construct('email_verification', [
-            'verification_code' => $code
+            'verification_url' => $url
         ]);
     }
 }

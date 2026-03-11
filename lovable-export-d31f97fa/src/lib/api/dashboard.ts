@@ -275,6 +275,9 @@ export const clientApi = {
     api.post("/auth/password/email", MessageSchema, { email }),
   resetPassword: (data: any) =>
     api.post("/auth/password/reset", MessageSchema, data),
+
+  // Email Verification
+  resendVerification: () => api.post("/auth/resend-verification", MessageSchema, {}),
 };
 
 export const twoFactorApi = {
