@@ -28,9 +28,13 @@ class FacebookService
         }
 
         try {
-            $websiteUrl = config('app.url', 'http://upgraderproxy.com'); 
-            // Ensure the blog link points to the root (no /api/)
-            $rootUrl = str_replace('/api', '', rtrim($websiteUrl, '/'));
+            $websiteUrl = config('app.url', 'https://upgraderproxy.com'); 
+            
+            // Ensure the blog link points to the root (no /api)
+            $rootUrl = rtrim($websiteUrl, '/');
+            if (str_ends_with($rootUrl, '/api')) {
+                $rootUrl = \Illuminate\Support\Str::replaceLast('/api', '', $rootUrl);
+            }
             $postUrl = $rootUrl . '/blog/' . $post->slug;
 
             $message = $post->title . "\n\n" . $post->excerpt . "\n\n" . "Read more: " . $postUrl;

@@ -29,11 +29,15 @@ class TelegramService
 
         try {
             $websiteUrl = config('app.url');
-            Log::info('Telegram Debug: App URL from config', ['url' => $websiteUrl]);
             
+            // If APP_URL points to /api, we need the parent directory for frontend links
+            if (str_ends_with(rtrim($websiteUrl, '/'), '/api')) {
+                $websiteUrl = Str::replaceLast('/api', '', rtrim($websiteUrl, '/'));
+            }
+
             if (!$websiteUrl || str_contains($websiteUrl, 'localhost')) {
-                Log::warning('Telegram Warning: APP_URL is not set correctly in .env. Falling back to request host.');
-                $websiteUrl = 'http://upgraderproxy.com'; // Hardcoded fallback for your specific site
+                Log::warning('Telegram Warning: APP_URL is not set correctly or is localhost. Falling back to hardcoded production URL.');
+                $websiteUrl = 'https://upgraderproxy.com';
             }
 
             $postUrl = rtrim($websiteUrl, '/') . '/blog/' . $post->slug;

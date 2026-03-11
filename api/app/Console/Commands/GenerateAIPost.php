@@ -94,7 +94,11 @@ class GenerateAIPost extends Command
             $x->sendTweet($post);
 
             // 8. Google Indexing
-            $indexing->publishUrl(url('/blog/' . $post->slug));
+            $frontendUrl = config('app.url');
+            if (str_ends_with(rtrim($frontendUrl, '/'), '/api')) {
+                $frontendUrl = Str::replaceLast('/api', '', rtrim($frontendUrl, '/'));
+            }
+            $indexing->publishUrl(rtrim($frontendUrl, '/') . '/blog/' . $post->slug);
 
             Log::info("Cron: Success! Blog published and shared: {$post->title}");
             

@@ -33,7 +33,11 @@ class XService
 
         try {
             $websiteUrl = config('app.url', 'https://upgraderproxy.com');
-            $rootUrl = str_replace('/api', '', rtrim($websiteUrl, '/'));
+            
+            $rootUrl = rtrim($websiteUrl, '/');
+            if (str_ends_with($rootUrl, '/api')) {
+                $rootUrl = \Illuminate\Support\Str::replaceLast('/api', '', $rootUrl);
+            }
             $postUrl = $rootUrl . '/blog/' . $post->slug;
 
             $text = $post->title . "\n\n" . "Read more: " . $postUrl;
