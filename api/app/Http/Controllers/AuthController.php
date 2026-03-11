@@ -71,13 +71,9 @@ class AuthController extends Controller
             ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
         );
         
-        // Force /api prefix if missing (Subfolder hosting fix)
-        if (!str_contains($verificationUrl, '/api/')) {
-            $verificationUrl = str_replace(url('/'), url('/') . '/api', $verificationUrl);
-        }
-        
         try {
             $user->notify(new \App\Notifications\EmailVerificationNotification($verificationUrl));
+
         } catch (\Exception $e) {
             \Log::error("Registration Link Error: " . $e->getMessage());
         }
@@ -512,15 +508,10 @@ class AuthController extends Controller
             ['id' => $user->id, 'hash' => sha1($user->getEmailForVerification())]
         );
 
-        // Force /api prefix if missing (Subfolder hosting fix)
-        if (!str_contains($verificationUrl, '/api/')) {
-            $verificationUrl = str_replace(url('/'), url('/') . '/api', $verificationUrl);
-        }
-
-
         // Send Notification
         try {
             $user->notify(new EmailVerificationNotification($verificationUrl));
+
         } catch (\Exception $e) {
             \Log::error("Link Notification Error: " . $e->getMessage());
             return response()->json(['message' => 'Failed to send email. Please check your SMTP settings.'], 500);
