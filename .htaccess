@@ -20,9 +20,8 @@
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-    # Exclude API folder
-    RewriteCond %{REQUEST_URI} ^/api [NC]
-    RewriteRule ^ - [L]
+    # Exclude API folder (Don't let root index.php handle it)
+    RewriteRule ^api(/|$) - [L,NC]
 
     # Stop 404 falling back to index.php for actual assets
     RewriteCond %{REQUEST_URI} \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|webmanifest)$ [NC]
