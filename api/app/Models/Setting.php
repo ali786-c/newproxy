@@ -20,6 +20,7 @@ class Setting extends Model
         'crypto_api_key',
         'nowpayments_api_key',
         'nowpayments_ipn_secret',
+        'linkedin_access_token',
     ];
 
     public static function getValue($key, $default = null)

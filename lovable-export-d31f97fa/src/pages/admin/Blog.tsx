@@ -17,7 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Send, Clock, FileText, Search, Plus, Trash2, Edit2, Loader2, Globe, Mail, Settings, Rss, Eye, Sparkles, Save, Bot, Key, Zap, Facebook, Twitter
+  Send, Clock, FileText, Search, Plus, Trash2, Edit2, Loader2, Globe, Mail, Settings, Rss, Eye, Sparkles, Save, Bot, Key, Zap, Facebook, Twitter, Linkedin
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
@@ -40,6 +40,8 @@ import {
   useSharePostToFacebook,
   useTestXSharing,
   useSharePostToX,
+  useTestLinkedInSharing,
+  useSharePostToLinkedIn,
 } from "@/hooks/use-backend";
 
 const STATUS_BADGE: Record<string, "default" | "secondary" | "outline"> = {
@@ -82,6 +84,8 @@ export default function AdminBlog() {
   const shareToFacebook = useSharePostToFacebook();
   const testX = useTestXSharing();
   const shareToX = useSharePostToX();
+  const testLinkedIn = useTestLinkedInSharing();
+  const shareToLinkedIn = useSharePostToLinkedIn();
 
   const [newKeyword, setNewKeyword] = useState("");
   const [newCategory, setNewCategory] = useState("General");
@@ -114,6 +118,12 @@ export default function AdminBlog() {
   const [xSecretConfigured, setXSecretConfigured] = useState(false);
   const [xTokenSecretConfigured, setXTokenSecretConfigured] = useState(false);
 
+  // LinkedIn Settings Local State
+  const [linkedinUrn, setLinkedinUrn] = useState("");
+  const [linkedinToken, setLinkedinToken] = useState("");
+  const [linkedinAutoEnabled, setLinkedinAutoEnabled] = useState(false);
+  const [linkedinConfigured, setLinkedinConfigured] = useState(false);
+
   // AI Generation Progress State
   const [progressStep, setProgressStep] = useState(0);
   const steps = [
@@ -124,7 +134,8 @@ export default function AdminBlog() {
     "Saving to database...",
     "Sharing to Telegram channel...",
     "Posting to Facebook Page...",
-    "Tweeting to X (Twitter)..."
+    "Tweeting to X (Twitter)...",
+    "Sharing to LinkedIn feed..."
   ];
 
   useEffect(() => {
@@ -161,6 +172,10 @@ export default function AdminBlog() {
       setXAutoEnabled(autoBlogData.settings.x_auto_post_enabled || false);
       setXSecretConfigured(autoBlogData.settings.x_api_secret_configured || false);
       setXTokenSecretConfigured(autoBlogData.settings.x_access_token_secret_configured || false);
+
+      setLinkedinUrn(autoBlogData.settings.linkedin_urn || "");
+      setLinkedinAutoEnabled(autoBlogData.settings.linkedin_auto_post_enabled || false);
+      setLinkedinConfigured(autoBlogData.settings.linkedin_access_token_configured || false);
     }
   }, [autoBlogData]);
 
@@ -197,6 +212,21 @@ export default function AdminBlog() {
           toast({ title: "Facebook Connection Success", description: data.description || "Test post shared successfully!" });
         } else {
           toast({ title: "Facebook Test Failed", description: data.description || "Check your Page ID and Token.", variant: "destructive" });
+        }
+      },
+      onError: (err: any) => {
+        toast({ title: "Test Error", description: err.message || "Failed to contact API.", variant: "destructive" });
+      }
+    });
+  };
+
+  const handleTestLinkedIn = () => {
+    testLinkedIn.mutate(undefined, {
+      onSuccess: (data: any) => {
+        if (data.ok) {
+          toast({ title: "LinkedIn Connection Success", description: data.description || "Test post shared successfully!" });
+        } else {
+          toast({ title: "LinkedIn Test Failed", description: data.description || "Check your URN and Token.", variant: "destructive" });
         }
       },
       onError: (err: any) => {
@@ -261,12 +291,16 @@ export default function AdminBlog() {
       x_access_token: xAccessToken,
       x_access_token_secret: xAccessTokenSecret,
       x_auto_post_enabled: xAutoEnabled,
+      linkedin_urn: linkedinUrn,
+      linkedin_access_token: linkedinToken,
+      linkedin_auto_post_enabled: linkedinAutoEnabled,
     }, {
       onSuccess: () => {
         setGoogleJson(""); // Clear for security
         setFacebookToken(""); // Clear for security
         setXApiSecret(""); // Clear for security
         setXAccessTokenSecret(""); // Clear for security
+        setLinkedinToken(""); // Clear for security
         toast({
           title: "Settings Saved",
           description: "Automation configuration updated successfully."
@@ -487,6 +521,32 @@ export default function AdminBlog() {
                                 <Twitter className="h-3.5 w-3.5" />
                               )}
                             </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                shareToLinkedIn.mutate(post.id, {
+                                  onSuccess: (data: any) => toast({
+                                    title: "LinkedIn Share",
+                                    description: data.message
+                                  }),
+                                  onError: (error: any) => toast({
+                                    variant: "destructive",
+                                    title: "Error",
+                                    description: error?.message || "Failed to share to LinkedIn"
+                                  })
+                                });
+                              }}
+                              disabled={shareToLinkedIn.isPending || post.is_draft}
+                              className="h-8 w-8 text-blue-800 hover:text-blue-900"
+                              title="Send to LinkedIn"
+                            >
+                              {shareToLinkedIn.isPending && shareToLinkedIn.variables === post.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Linkedin className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
                             <Button size="icon" variant="ghost" onClick={() => openEdit(post)} className="h-8 w-8">
                               <Edit2 className="h-3.5 w-3.5" />
                             </Button>
@@ -530,12 +590,13 @@ export default function AdminBlog() {
                     Core Configuration
                   </div>
                   <Tabs defaultValue="gemini">
-                    <TabsList className="grid grid-cols-4 w-full h-auto">
-                      <TabsTrigger value="gemini" className="text-xs">Gemini AI</TabsTrigger>
-                      <TabsTrigger value="telegram" className="text-xs">Telegram</TabsTrigger>
-                      <TabsTrigger value="indexing" className="text-xs">Indexing</TabsTrigger>
-                      <TabsTrigger value="facebook" className="text-xs">Facebook</TabsTrigger>
-                      <TabsTrigger value="x" className="text-xs">X (Twitter)</TabsTrigger>
+                    <TabsList className="grid grid-cols-5 w-full h-auto">
+                      <TabsTrigger value="gemini" className="text-[10px] px-1">Gemini AI</TabsTrigger>
+                      <TabsTrigger value="telegram" className="text-[10px] px-1">Telegram</TabsTrigger>
+                      <TabsTrigger value="indexing" className="text-[10px] px-1">Indexing</TabsTrigger>
+                      <TabsTrigger value="facebook" className="text-[10px] px-1">Facebook</TabsTrigger>
+                      <TabsTrigger value="x" className="text-[10px] px-1">X (Twitter)</TabsTrigger>
+                      <TabsTrigger value="linkedin" className="text-[10px] px-1">LinkedIn</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="gemini" className="space-y-4 mt-4">
@@ -771,6 +832,55 @@ export default function AdminBlog() {
                           className="w-full gap-2"
                         >
                           {testX.isPending ? "Testing..." : <><Twitter className="h-4 w-4" /> Test X Tweet</>}
+                        </Button>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="linkedin" className="space-y-4 pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium">Automatic LinkedIn Sharing</h4>
+                          <p className="text-xs text-muted-foreground">Share every new blog post to LinkedIn feed automatically.</p>
+                        </div>
+                        <Switch
+                          checked={linkedinAutoEnabled}
+                          onCheckedChange={setLinkedinAutoEnabled}
+                        />
+                      </div>
+
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label>Author URN</Label>
+                          <Input
+                            placeholder="urn:li:person:XXXX or urn:li:organization:XXXX"
+                            value={linkedinUrn}
+                            onChange={(e) => setLinkedinUrn(e.target.value)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Access Token</Label>
+                          <div className="relative">
+                            <Input
+                              type="password"
+                              placeholder={linkedinConfigured ? "••••••••••••••••" : "Paste your LinkedIn Access Token"}
+                              value={linkedinToken}
+                              onChange={(e) => setLinkedinToken(e.target.value)}
+                              autoComplete="off"
+                            />
+                            {linkedinConfigured && !linkedinToken && (
+                              <span className="absolute right-3 top-2.5 text-[10px] text-green-500 font-medium">CONFIGURED</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">This token is stored encrypted in our database.</p>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          onClick={handleTestLinkedIn}
+                          disabled={testLinkedIn.isPending}
+                          className="w-full gap-2"
+                        >
+                          {testLinkedIn.isPending ? "Testing..." : <><Linkedin className="h-4 w-4" /> Test LinkedIn Post</>}
                         </Button>
                       </div>
                     </TabsContent>

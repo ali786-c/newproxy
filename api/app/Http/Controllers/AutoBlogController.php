@@ -43,6 +43,10 @@ class AutoBlogController extends Controller
                 'x_access_token' => Setting::getValue('x_access_token') ?: '',
                 'x_access_token_secret_configured' => !empty(Setting::getValue('x_access_token_secret')),
                 'x_auto_post_enabled' => Setting::getValue('x_auto_post_enabled', '0') === '1',
+                // LinkedIn settings
+                'linkedin_urn' => Setting::getValue('linkedin_urn') ?: '',
+                'linkedin_access_token_configured' => !empty(Setting::getValue('linkedin_access_token')),
+                'linkedin_auto_post_enabled' => Setting::getValue('linkedin_auto_post_enabled', '0') === '1',
             ]
         ]);
     }
@@ -110,6 +114,9 @@ class AutoBlogController extends Controller
             'x_access_token' => 'nullable|string',
             'x_access_token_secret' => 'nullable|string',
             'x_auto_post_enabled' => 'nullable|boolean',
+            'linkedin_urn' => 'nullable|string',
+            'linkedin_access_token' => 'nullable|string',
+            'linkedin_auto_post_enabled' => 'nullable|boolean',
         ]);
 
         if ($request->has('gemini_api_key')) {
@@ -190,11 +197,23 @@ class AutoBlogController extends Controller
             \App\Models\Setting::updateOrCreate(['key' => 'x_auto_post_enabled'], ['value' => $request->x_auto_post_enabled ? '1' : '0']);
         }
 
+        if ($request->has('linkedin_urn')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'linkedin_urn'], ['value' => $request->linkedin_urn]);
+        }
+
+        if ($request->has('linkedin_access_token')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'linkedin_access_token'], ['value' => $request->linkedin_access_token]);
+        }
+
+        if ($request->has('linkedin_auto_post_enabled')) {
+            \App\Models\Setting::updateOrCreate(['key' => 'linkedin_auto_post_enabled'], ['value' => $request->linkedin_auto_post_enabled ? '1' : '0']);
+        }
+
         \App\Models\AdminLog::log(
             'update_autoblog_settings',
             "Updated Auto-Blog Settings (including Telegram, Indexing, Facebook & X)",
             null,
-            $request->except(['gemini_api_key', 'telegram_bot_token', 'google_indexing_json', 'facebook_access_token', 'x_api_secret', 'x_access_token_secret']) // Don't log sensitive keys
+            $request->except(['gemini_api_key', 'telegram_bot_token', 'google_indexing_json', 'facebook_access_token', 'x_api_secret', 'x_access_token_secret', 'linkedin_access_token']) // Don't log sensitive keys
         );
 
         return response()->json(['message' => 'Settings updated.']);
@@ -322,7 +341,7 @@ class AutoBlogController extends Controller
 
     /**
      */
-    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing, \App\Services\FacebookService $facebook, \App\Services\XService $x)
+    public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing, \App\Services\FacebookService $facebook, \App\Services\XService $x, \App\Services\LinkedInService $linkedin)
     {
         $keywordObj = null;
 
@@ -400,7 +419,7 @@ class AutoBlogController extends Controller
             ]);
 
             $keywordObj->update(['last_used_at' => now()]);
-
+ 
             // 6. Share to Telegram (Background aware service)
             $telegramShared = $telegram->sendBlogPost($post);
 
@@ -415,14 +434,22 @@ class AutoBlogController extends Controller
                 \Illuminate\Support\Facades\Log::error("Auto-Post X Error: " . $e->getMessage());
             }
 
-            // 9. Notify Google Indexing API
+            // 9. Share to LinkedIn
+            $linkedinShared = false;
+            try {
+                $linkedinShared = $linkedin->sendBlogPost($post);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Auto-Post LinkedIn Error: " . $e->getMessage());
+            }
+
+            // 10. Notify Google Indexing API
             $indexing->publishUrl(url('/blog/' . $post->slug));
 
             \App\Models\AdminLog::log(
                 'trigger_autoblog',
-                "Generated AI blog. Telegram: " . ($telegramShared ? "YES" : "NO") . " | Facebook: " . ($facebookShared ? "YES" : "NO") . " | X: " . ($xShared ? "YES" : "NO"),
+                "Generated AI blog. Telegram: " . ($telegramShared ? "YES" : "NO") . " | Facebook: " . ($facebookShared ? "YES" : "NO") . " | X: " . ($xShared ? "YES" : "NO") . " | LinkedIn: " . ($linkedinShared ? "YES" : "NO"),
                 null,
-                ['post_id' => $post->id, 'keyword' => $keywordObj->keyword, 'telegram_shared' => $telegramShared, 'facebook_shared' => $facebookShared, 'x_shared' => $xShared]
+                ['post_id' => $post->id, 'keyword' => $keywordObj->keyword, 'telegram_shared' => $telegramShared, 'facebook_shared' => $facebookShared, 'x_shared' => $xShared, 'linkedin_shared' => $linkedinShared]
             );
 
             return response()->json([
@@ -430,7 +457,8 @@ class AutoBlogController extends Controller
                 'post' => $post,
                 'telegram_shared' => $telegramShared,
                 'facebook_shared' => $facebookShared,
-                'x_shared' => $xShared
+                'x_shared' => $xShared,
+                'linkedin_shared' => $linkedinShared
             ]);
 
         } catch (\Throwable $e) {

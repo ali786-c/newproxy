@@ -578,6 +578,19 @@ export function useSharePostToX() {
   });
 }
 
+export function useTestLinkedInSharing() {
+  return useMutation({
+    mutationFn: () => api.post("/admin/blog/automation/linkedin-test", z.any()),
+  });
+}
+
+export function useSharePostToLinkedIn() {
+  return useMutation({
+    mutationFn: (postId: number | string) =>
+      api.post("/admin/blog/automation/linkedin-share-post", z.any(), { post_id: postId }),
+  });
+}
+
 // Alert Hooks
 export function useAdminAlertConfig() {
   return useQuery({
