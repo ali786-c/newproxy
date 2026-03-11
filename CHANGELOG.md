@@ -5,7 +5,42 @@ All changes are logged here in reverse chronological order (newest first).
 
 ---
 
-## 2026-03-02
+## 2026-03-11
+
+### Fix: Email Verification Link 404 — Full Resolution 🔗✅
+
+**Problem:** Clicking the verification link in registration emails resulted in a persistent 404 error, even after hard refresh. The verified redirect and SPA route loading was also broken.
+
+**Root Causes (Multi-Layer Issue):**
+
+1. **Email Template Mismatch** — The `email_verification` template was designed for an OTP code but the system was sending a signed URL. Variable `{{verification_code}}` vs `{{action_url}}`. Template updated to a link-based design.
+
+2. **Stale `app/` Physical Folder** — A physical `app/` directory existed in `htdocs/` with an old build. Apache served this stale `index.html` (with broken asset hashes) instead of delegating to the root Smart Entry Point `index.php`. Folder renamed to `app_backup_stale/`.
+
+3. **Service Worker Interception** — The frontend Service Worker (`sw.js`) was intercepting all navigation requests including `/api/*` paths, and serving `index.html` instead of letting them reach the server. Added `/api` to the SW denylist.
+
+4. **Route in Wrong File (Core Bug)** — The verification route was placed in `web.php`, which registers it as `/auth/verify-email-link` (no prefix). But since the Laravel app lives in the `/api` subfolder, Apache always forwards requests with path `/api/auth/verify-email-link`. These paths never matched the web route → persistent 404.
+
+5. **Double `/api` Prefix on URL Generation** — Moving the route to `api.php` (correct file) caused `URL::temporarySignedRoute()` to generate `https://upgraderproxy.com/api/api/auth/...` because `APP_URL=https://upgraderproxy.com/api` already contains `/api`, and `api.php` routes also get `/api` prefix.
+
+**Final Fix:**
+
+- **Route moved to `api.php`** inside the `prefix('auth')` group → correctly registered at `/api/auth/verify-email-link`.
+- **New `buildVerificationUrl()` helper** in `AuthController` — manually generates a correctly-prefixed signed URL using `APP_URL` as the base, bypassing Laravel's route URL generator.
+- **`verifyEmailLink()` updated** to validate the custom HMAC signature (matching `hash_hmac('sha256', $url, config('app.key'))`) instead of `$request->hasValidSignature()`.
+- **`index.php` smart redirect** added as a safety net for old/bookmarked links without the `/api` prefix.
+
+**Files Changed:**
+- `api/routes/api.php` — Route added to `prefix('auth')` group
+- `api/routes/web.php` — Route removed
+- `api/app/Http/Controllers/AuthController.php` — `buildVerificationUrl()` + `verifyEmailLink()` updated
+- `api/database/seeders/EmailTemplateSeeder.php` — Template fixed to use `{{action_url}}`
+- `htdocs/sw.js` — `/api` path added to denylist
+- `htdocs/index.php` — Smart redirect for verification links
+
+---
+
+
 
 ### Feature: Dedicated User Management System 👥🚀
 - **Transition from Side-Panel:** Replaced the limited `Sheet` (side drawer) with a dedicated full-page user management dashboard.
