@@ -263,7 +263,8 @@ export default function AdminProducts() {
                   <TableHead className="text-right">Markup</TableHead>
                   <TableHead className="text-right">Sell Price</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead />
+                  <TableHead>Sort Order</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
