@@ -37,6 +37,12 @@ class LinkedInService
 
             $message = $post->title . "\n\n" . $post->excerpt . "\n\n" . "Read more: " . $postUrl;
 
+            // Attempt to upload image if available
+            $imageUrn = null;
+            if ($post->image_url) {
+                $imageUrn = $this->uploadImage($post->image_url, $accessToken, $authorUrn);
+            }
+
             $payload = [
                 'author' => $authorUrn,
                 'commentary' => $message,
@@ -46,16 +52,26 @@ class LinkedInService
                     'targetEntities' => [],
                     'thirdPartyDistributionChannels' => [],
                 ],
-                'content' => [
+                'lifecycleState' => 'PUBLISHED',
+                'isReshareDisabledByAuthor' => false,
+            ];
+
+            if ($imageUrn) {
+                $payload['content'] = [
+                    'media' => [
+                        'id' => $imageUrn,
+                        'altText' => $post->title,
+                    ],
+                ];
+            } else {
+                $payload['content'] = [
                     'article' => [
                         'source' => $postUrl,
                         'title' => $post->title,
                         'description' => $post->excerpt,
                     ],
-                ],
-                'lifecycleState' => 'PUBLISHED',
-                'isReshareDisabledByAuthor' => false,
-            ];
+                ];
+            }
 
             $response = Http::withToken($accessToken)
                 ->withHeaders([
@@ -76,6 +92,72 @@ class LinkedInService
         } catch (\Exception $e) {
             Log::error("LinkedIn Service Exception: " . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Upload an image to LinkedIn and return its URN.
+     */
+    private function uploadImage($imageUrl, $accessToken, $authorUrn)
+    {
+        try {
+            // Resolve local path
+            // Example URL: https://upgraderproxy.com/storage/blog/filename.jpg
+            // Local path: C:\xampp\htdocs\api\public\storage\blog\filename.jpg
+            
+            $path = public_path($imageUrl);
+            if (!file_exists($path)) {
+                // Try to strip the root URL if it's an absolute URL
+                $websiteUrl = config('app.url');
+                $relativeUrl = str_replace($websiteUrl, '', $imageUrl);
+                $path = public_path($relativeUrl);
+            }
+
+            if (!file_exists($path)) {
+                Log::warning("LinkedIn: Image not found locally at $path for URL $imageUrl");
+                return null;
+            }
+
+            // 1. Initialize Upload
+            $initResponse = Http::withToken($accessToken)
+                ->withHeaders([
+                    'LinkedIn-Version' => '202503',
+                    'X-Restli-Protocol-Version' => '2.0.0',
+                ])
+                ->withoutVerifying()
+                ->post('https://api.linkedin.com/rest/images?action=initializeUpload', [
+                    'initializeUploadRequest' => [
+                        'owner' => $authorUrn,
+                    ],
+                ]);
+
+            if (!$initResponse->successful()) {
+                Log::error("LinkedIn: Image Init Failed: " . $initResponse->body());
+                return null;
+            }
+
+            $initData = $initResponse->json();
+            $uploadUrl = $initData['value']['uploadUrl'];
+            $imageUrn = $initData['value']['image'];
+
+            // 2. Upload Binary
+            $imageBinary = file_get_contents($path);
+            $mimeType = mime_content_type($path);
+
+            $uploadResponse = Http::withBody($imageBinary, $mimeType)
+                ->withoutVerifying()
+                ->put($uploadUrl);
+
+            if (!$uploadResponse->successful()) {
+                Log::error("LinkedIn: Image Binary Upload Failed: " . $uploadResponse->status());
+                return null;
+            }
+
+            return $imageUrn;
+
+        } catch (\Exception $e) {
+            Log::error("LinkedIn: Image Upload Exception: " . $e->getMessage());
+            return null;
         }
     }
 
