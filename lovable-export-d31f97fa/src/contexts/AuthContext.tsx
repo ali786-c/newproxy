@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   sendEmailVerification,
   signOut as firebaseSignOut,
   onAuthStateChanged,
@@ -96,6 +97,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if ('user' in response && 'token' in response) {
         const { user, token } = response;
         tokenStorage.set(token);
+        
+        // --- Sync Firebase Session ---
+        try {
+          await signInWithEmailAndPassword(firebaseAuth, data.email, data.password);
+        } catch (fbErr: any) {
+          console.warn("Firebase auto-sync on login failed:", fbErr.message);
+        }
+
         setState((s) => ({ ...s, user, isLoading: false, error: null, is2FAPending: false, challengeToken: null }));
         return user;
       }
@@ -164,14 +173,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem("referral_code");
         }
 
-        // 2. Create Firebase user (non-blocking)
-        // Note: Backend now generates and sends the Firebase verification link via Brevo.
+        // 2. Create or Sign In to Firebase User
         try {
-          const fbCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
-          setState((s) => ({ ...s, firebaseUser: fbCredential.user }));
+          await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
         } catch (fbErr: any) {
-          // Non-fatal — user can resend or we'll detect existing account
-          console.warn("Firebase signup warning:", fbErr.code, fbErr.message);
+          if (fbErr.code === 'auth/email-already-in-use') {
+            try {
+              await signInWithEmailAndPassword(firebaseAuth, data.email, data.password);
+            } catch (innerErr) {
+              console.warn("Firebase sign-in fallback failed during signup:", innerErr);
+            }
+          } else {
+            console.warn("Firebase signup error:", fbErr.code, fbErr.message);
+          }
         }
 
         return user;
@@ -192,15 +206,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const syncFirebaseVerification = useCallback(async (): Promise<boolean> => {
     const fbUser = firebaseAuth.currentUser;
-    if (!fbUser) return false;
+    console.log("Syncing Firebase verification. Active Firebase User:", fbUser?.email);
+    
+    if (!fbUser) {
+      console.warn("Sync failed: No active Firebase user session.");
+      return false;
+    }
 
     try {
+      console.log("Reloading Firebase user...");
       await fbUser.reload();
       const refreshedUser = firebaseAuth.currentUser;
+      console.log("Firebase user reloaded. emailVerified:", refreshedUser?.emailVerified);
+      
       if (!refreshedUser?.emailVerified) return false;
 
+      console.log("Fetching Firebase ID token...");
       const idToken = await refreshedUser.getIdToken(true);
+      
+      console.log("Calling SaaS backend firebase-sync...");
       await authApi.firebaseSync(idToken);
+      
+      console.log("Sync complete. Refreshing user data...");
       await loadUser();
       return true;
     } catch (err: any) {
