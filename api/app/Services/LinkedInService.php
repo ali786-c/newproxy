@@ -101,22 +101,36 @@ class LinkedInService
     private function uploadImage($imageUrl, $accessToken, $authorUrn)
     {
         try {
-            // Resolve local path
-            // Example URL: https://upgraderproxy.com/storage/blog/filename.jpg
-            // Local path: C:\xampp\htdocs\api\public\storage\blog\filename.jpg
+            Log::info("LinkedIn: Handling image upload for: $imageUrl");
+
+            // 1. Resolve local path elegantly
+            $path = null;
             
-            $path = public_path($imageUrl);
+            if (str_starts_with($imageUrl, 'http')) {
+                // Absolute URL
+                $parsed = parse_url($imageUrl);
+                $pathPart = ltrim($parsed['path'] ?? '', '/');
+                $path = public_path($pathPart);
+            } else {
+                // Relative path
+                $path = public_path(ltrim($imageUrl, '/'));
+            }
+
+            // Fallback for common storage paths if first attempt fails
             if (!file_exists($path)) {
-                // Try to strip the root URL if it's an absolute URL
-                $websiteUrl = config('app.url');
-                $relativeUrl = str_replace($websiteUrl, '', $imageUrl);
-                $path = public_path($relativeUrl);
+                $filename = basename($imageUrl);
+                $fallback = public_path('storage/blog/' . $filename);
+                if (file_exists($fallback)) {
+                    $path = $fallback;
+                }
             }
 
             if (!file_exists($path)) {
-                Log::warning("LinkedIn: Image not found locally at $path for URL $imageUrl");
+                Log::warning("LinkedIn: Image not found at $path. Posting text/article only.");
                 return null;
             }
+
+            Log::info("LinkedIn: Resolved local path: $path");
 
             // 1. Initialize Upload
             $initResponse = Http::withToken($accessToken)
@@ -149,10 +163,11 @@ class LinkedInService
                 ->put($uploadUrl);
 
             if (!$uploadResponse->successful()) {
-                Log::error("LinkedIn: Image Binary Upload Failed: " . $uploadResponse->status());
+                Log::error("LinkedIn: Image Binary Upload Failed status: " . $uploadResponse->status());
                 return null;
             }
 
+            Log::info("LinkedIn: Image successfully uploaded as asset: $imageUrn");
             return $imageUrn;
 
         } catch (\Exception $e) {
