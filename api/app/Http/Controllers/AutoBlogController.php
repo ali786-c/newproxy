@@ -340,6 +340,36 @@ class AutoBlogController extends Controller
     }
 
     /**
+     * Admin: Test LinkedIn connectivity.
+     */
+    public function testLinkedIn(Request $request, \App\Services\LinkedInService $linkedin)
+    {
+        return response()->json($linkedin->sendTestMessage());
+    }
+
+    /**
+     * Admin: Manually share a specific blog post to LinkedIn.
+     */
+    public function sharePostToLinkedIn(Request $request, \App\Services\LinkedInService $linkedin)
+    {
+        \Illuminate\Support\Facades\Log::info('Admin LinkedIn Share Request Received', ['post_id' => $request->post_id]);
+
+        $request->validate([
+            'post_id' => 'required|exists:blog_posts,id'
+        ]);
+
+        $post = \App\Models\BlogPost::findOrFail($request->post_id);
+        
+        $success = $linkedin->sendBlogPost($post);
+
+        if ($success) {
+            return response()->json(['message' => 'Post shared to LinkedIn successfully!']);
+        }
+
+        return response()->json(['message' => 'LinkedIn sharing failed. Check logs.'], 500);
+    }
+
+    /**
      */
     public function trigger(Request $request, GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing, \App\Services\FacebookService $facebook, \App\Services\XService $x, \App\Services\LinkedInService $linkedin)
     {
