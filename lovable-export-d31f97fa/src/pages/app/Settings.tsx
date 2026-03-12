@@ -23,6 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { Plus, Trash2, Key, Shield, Copy, Loader2, Check, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { clientApi, type AllowlistEntry, type ApiKey } from "@/lib/api/dashboard";
+import { authApi } from "@/lib/api/auth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { sendEmailVerification } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase";

@@ -4,7 +4,7 @@ import { getAuth } from "firebase/auth";
 // Firebase project: upgraderproxy
 const firebaseConfig = {
   apiKey: "AIzaSyBp9RfA0IoikthkFxxr99sdQG-DLZG81Kw",
-  authDomain: "upgraderproxy.firebaseapp.com",
+  authDomain: "auth.upgraderproxy.com",
   projectId: "upgraderproxy",
   storageBucket: "upgraderproxy.firebasestorage.app",
   messagingSenderId: "757181549583",
