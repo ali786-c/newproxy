@@ -37,10 +37,6 @@ class LinkedInService
 
             $message = $post->title . "\n\n" . $post->excerpt . "\n\n" . "Read more: " . $postUrl;
 
-            // Simplified LinkedIn Post (Text + Link)
-            // For images, LinkedIn requires a multi-step upload process which we can add if needed.
-            // For now, we'll implement the primary share functionality.
-
             $payload = [
                 'author' => $authorUrn,
                 'commentary' => $message,
@@ -62,6 +58,10 @@ class LinkedInService
             ];
 
             $response = Http::withToken($accessToken)
+                ->withHeaders([
+                    'LinkedIn-Version' => '202401',
+                    'X-Restli-Protocol-Version' => '2.0.0',
+                ])
                 ->withoutVerifying()
                 ->post('https://api.linkedin.com/rest/posts', $payload);
 
@@ -109,6 +109,10 @@ class LinkedInService
             ];
 
             $response = Http::withToken($accessToken)
+                ->withHeaders([
+                    'LinkedIn-Version' => '202401',
+                    'X-Restli-Protocol-Version' => '2.0.0',
+                ])
                 ->withoutVerifying()
                 ->post('https://api.linkedin.com/rest/posts', $payload);
 
