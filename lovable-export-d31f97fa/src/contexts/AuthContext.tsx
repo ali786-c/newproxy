@@ -6,6 +6,14 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  type User as FirebaseUser,
+} from "firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
 import { authApi, type User, type LoginInput, type SignupInput } from "@/lib/api/auth";
 import { tokenStorage } from "@/lib/api/client";
 
@@ -15,6 +23,7 @@ interface AuthState {
   error: string | null;
   is2FAPending: boolean;
   challengeToken: string | null;
+  firebaseUser: FirebaseUser | null;
 }
 
 interface AuthContextValue extends AuthState {
@@ -25,6 +34,7 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
+  syncFirebaseVerification: () => Promise<boolean>;
   isAuthenticated: boolean;
   is2FAPending: boolean;
 }
@@ -38,26 +48,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error: null,
     is2FAPending: false,
     challengeToken: null,
+    firebaseUser: null,
   });
 
   const loadUser = useCallback(async () => {
     const token = tokenStorage.get();
     if (!token) {
-      setState({ user: null, isLoading: false, error: null, is2FAPending: false, challengeToken: null });
+      setState({ user: null, isLoading: false, error: null, is2FAPending: false, challengeToken: null, firebaseUser: null });
       return;
     }
     try {
       const user = await authApi.me();
-      setState({ user, isLoading: false, error: null, is2FAPending: false, challengeToken: null });
+      setState((s) => ({ ...s, user, isLoading: false, error: null, is2FAPending: false, challengeToken: null }));
     } catch {
       tokenStorage.clear();
-      setState({ user: null, isLoading: false, error: null, is2FAPending: false, challengeToken: null });
+      setState({ user: null, isLoading: false, error: null, is2FAPending: false, challengeToken: null, firebaseUser: null });
     }
   }, []);
 
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  // Track Firebase auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (fbUser) => {
+      setState((s) => ({ ...s, firebaseUser: fbUser }));
+    });
+    return () => unsubscribe();
+  }, []);
 
   const login = useCallback(async (data: LoginInput) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
@@ -130,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const referralCode = localStorage.getItem("referral_code");
       const signupData = referralCode ? { ...data, referral_code: referralCode } : data;
 
+      // 1. Create user in SaaS backend
       const response = await authApi.signup(signupData);
       if ('requires_2fa' in response && response.requires_2fa) {
         throw new Error("Registration should not redirect to 2FA challenge");
@@ -138,11 +158,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if ('user' in response && 'token' in response) {
         const { user, token } = response;
         tokenStorage.set(token);
-        setState({ user, isLoading: false, error: null, is2FAPending: false, challengeToken: null });
+        setState({ user, isLoading: false, error: null, is2FAPending: false, challengeToken: null, firebaseUser: null });
 
-        // Clean up referral code after successful signup
         if (referralCode) {
           localStorage.removeItem("referral_code");
+        }
+
+        // 2. Create Firebase user and send verification email (non-blocking)
+        try {
+          const fbCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
+          await sendEmailVerification(fbCredential.user);
+          setState((s) => ({ ...s, firebaseUser: fbCredential.user }));
+        } catch (fbErr: any) {
+          // Non-fatal — user can resend from Settings page
+          console.warn("Firebase signup warning:", fbErr.code, fbErr.message);
         }
 
         return user;
@@ -155,6 +184,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw err;
     }
   }, []);
+
+  /**
+   * Syncs Firebase email verification status to the SaaS database.
+   * Reloads Firebase user → if emailVerified → sends ID token to backend.
+   * Returns true if successfully synced.
+   */
+  const syncFirebaseVerification = useCallback(async (): Promise<boolean> => {
+    const fbUser = firebaseAuth.currentUser;
+    if (!fbUser) return false;
+
+    try {
+      await fbUser.reload();
+      const refreshedUser = firebaseAuth.currentUser;
+      if (!refreshedUser?.emailVerified) return false;
+
+      const idToken = await refreshedUser.getIdToken(true);
+      await authApi.firebaseSync(idToken);
+      await loadUser();
+      return true;
+    } catch (err: any) {
+      console.error("Firebase sync failed:", err.message);
+      return false;
+    }
+  }, [loadUser]);
 
   const handleGoogleCallback = useCallback(async (code: string) => {
     setState((s) => ({ ...s, isLoading: true, error: null }));
@@ -175,7 +228,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if ('user' in response && 'token' in response) {
         const { user, token } = response;
         tokenStorage.set(token);
-        // Clear referral after successful use
         localStorage.removeItem("referral_code");
         setState((s) => ({ ...s, user, isLoading: false, error: null, is2FAPending: false, challengeToken: null }));
         return user;
@@ -192,9 +244,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
+      await firebaseSignOut(firebaseAuth).catch(() => {});
     } finally {
       tokenStorage.clear();
-      setState({ user: null, isLoading: false, error: null, is2FAPending: false, challengeToken: null });
+      setState({ user: null, isLoading: false, error: null, is2FAPending: false, challengeToken: null, firebaseUser: null });
     }
   }, []);
 
@@ -213,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         clearError,
         refreshUser: loadUser,
+        syncFirebaseVerification,
         isAuthenticated: !!state.user,
         is2FAPending: state.is2FAPending,
       }}

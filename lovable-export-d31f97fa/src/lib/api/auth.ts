@@ -73,4 +73,14 @@ export const authApi = {
   googleRedirect: () => api.get("/auth/google/redirect", z.object({ url: z.string() })),
   googleCallback: (code: string, referralCode?: string) =>
     api.get(`/auth/google/callback?code=${code}${referralCode ? `&referral_code=${referralCode}` : ""}`, AuthResponseSchema),
+  /**
+   * Sync Firebase email verification to SaaS.
+   * Called ONLY after Firebase confirms emailVerified = true.
+   * Sends the Firebase ID token to backend for validation.
+   */
+  firebaseSync: (firebaseIdToken: string) =>
+    api.post("/auth/firebase-sync", z.object({ message: z.string(), user: UserSchema.optional() }), {
+      firebase_id_token: firebaseIdToken,
+    }),
 };
+

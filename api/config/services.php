@@ -69,4 +69,8 @@ return [
         'indexing_key' => env('GOOGLE_INDEXING_CRYPTO_KEY'),
     ],
 
+    'firebase' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+    ],
+
 ];

@@ -13,8 +13,10 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Cache;
 use App\Services\EvomiService;
 use PragmaRX\Google2FALaravel\Facade as Google2FA;
-use App\Notifications\EmailVerificationNotification;
-use Illuminate\Support\Facades\URL;
+use Kreait\Firebase\Factory;
+use Kreait\Firebase\Auth as FirebaseAuth;
+use Kreait\Firebase\Exception\Auth\RevokedIdToken;
+use Kreait\Firebase\Exception\Auth\InvalidToken;
 
 class AuthController extends Controller
 {
@@ -63,22 +65,10 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth_token')->plainTextToken;
-        
-        // --- Email Verification Link ---
-        // Uses manual URL construction to avoid /api/api double-prefix issue.
-        // APP_URL=https://upgraderproxy.com/api causes URL::temporarySignedRoute to
-        // generate .../api/api/auth/... which is wrong. We build it ourselves.
-        $verificationUrl = $this->buildVerificationUrl($user);
-        
-        try {
-            $user->notify(new \App\Notifications\EmailVerificationNotification($verificationUrl));
 
-        } catch (\Exception $e) {
-            \Log::error("Registration Link Error: " . $e->getMessage());
-        }
-        // ------------------------------------
-
-        // --- NEW: Trigger Dynamic Emails ---
+        // --- Trigger Dynamic Emails (Welcome + Admin Alert) ---
+        // Note: Email VERIFICATION is now handled by Firebase on the frontend.
+        // This block only sends the welcome email and admin notification.
         try {
             $user->notify(new \App\Notifications\WelcomeNotification([
                 'user' => ['name' => $user->name],
@@ -493,121 +483,78 @@ class AuthController extends Controller
     }
 
     /**
-     * Resend verification link.
-     * POST /auth/resend-verification
+     * Sync Firebase email verification to SaaS database.
+     * POST /auth/firebase-sync
+     * 
+     * Called by the frontend after Firebase confirms emailVerified = true.
+     * Verifies the Firebase ID token, checks emailVerified flag,
+     * then marks email_verified_at in the local DB.
      */
-    public function resendVerification(Request $request)
+    public function firebaseSync(Request $request)
     {
+        $request->validate([
+            'firebase_id_token' => 'required|string',
+        ]);
+
         $user = $request->user();
 
+        // Already verified — no work needed
         if ($user->email_verified_at) {
-            return response()->json(['message' => 'Email already verified.'], 400);
+            return response()->json([
+                'message' => 'Already verified.',
+                'user'    => $this->formatUser($user),
+            ]);
         }
 
-        // Throttle check: 60 seconds cooldown
-        $cacheKey = "resend_link_cooldown_{$user->id}";
-        if (Cache::has($cacheKey)) {
-            $seconds = Cache::get($cacheKey) - time();
-            if ($seconds > 0) {
-                return response()->json([
-                    'message' => "Please wait {$seconds} seconds before requesting a new link."
-                ], 429);
-            }
-        }
-
-        // Generate Signed Link
-        $verificationUrl = $this->buildVerificationUrl($user);
-
-
-        // Send Notification
         try {
-            $user->notify(new EmailVerificationNotification($verificationUrl));
+            $credentialsPath = config('services.firebase.credentials');
 
-        } catch (\Exception $e) {
-            \Log::error("Link Notification Error: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to send email. Please check your SMTP settings.'], 500);
-        }
+            $factory = (new Factory)->withServiceAccount($credentialsPath);
+            $auth    = $factory->createAuth();
 
-        // Set Cooldown
-        Cache::put($cacheKey, time() + 60, 60);
+            // Verify the token (throws on invalid/expired)
+            $verifiedToken = $auth->verifyIdToken($request->firebase_id_token);
 
-        return response()->json(['message' => 'Verification link sent to your email.']);
-    }
+            // Check Firebase emailVerified claim
+            $claims = $verifiedToken->claims();
+            $emailVerified = $claims->get('email_verified', false);
 
-    /**
-     * Verify email via Magic Link.
-     * GET /auth/verify-email-link
-     */
-    public function verifyEmailLink(Request $request)
-    {
-        // Validate expiry
-        if (!$request->expires || now()->timestamp > (int) $request->expires) {
-            return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=false&error=link_expired');
-        }
+            if (!$emailVerified) {
+                return response()->json([
+                    'message' => 'Firebase email not yet verified. Please click the link in your email first.',
+                ], 422);
+            }
 
-        // Reconstruct the URL that was signed (must match buildVerificationUrl exactly)
-        $baseUrl = rtrim(env('APP_URL', url('/')), '/');
-        $path    = '/auth/verify-email-link';
-        $params  = http_build_query([
-            'expires' => $request->expires,
-            'hash'    => $request->hash,
-            'id'      => $request->id,
-        ]);
-        $urlToSign = $baseUrl . $path . '?' . $params;
+            // Double-check the Firebase email matches the SaaS user email
+            $firebaseEmail = $claims->get('email', '');
+            if (strtolower($firebaseEmail) !== strtolower($user->email)) {
+                \Log::warning("Firebase sync email mismatch for user #{$user->id}: Firebase={$firebaseEmail}, SaaS={$user->email}");
+                return response()->json([
+                    'message' => 'Token email does not match your account email.',
+                ], 422);
+            }
 
-        // Verify the HMAC signature
-        $expectedSignature = hash_hmac('sha256', $urlToSign, config('app.key'));
-        if (!hash_equals($expectedSignature, (string) $request->signature)) {
-            return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=false&error=invalid_signature');
-        }
-
-        $user = User::findOrFail($request->id);
-
-        if (!hash_equals((string) $request->hash, sha1($user->getEmailForVerification()))) {
-             return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=false&error=invalid_hash');
-        }
-
-        if (!$user->hasVerifiedEmail()) {
+            // Mark as verified in SaaS DB
             $user->markEmailAsVerified();
             event(new \Illuminate\Auth\Events\Verified($user));
+
+            \Log::info("Firebase verification synced for user #{$user->id} ({$user->email})");
+
+            return response()->json([
+                'message' => 'Email verified successfully.',
+                'user'    => $this->formatUser($user->fresh()),
+            ]);
+
+        } catch (InvalidToken | RevokedIdToken $e) {
+            \Log::warning("Firebase sync invalid token for user #{$user->id}: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Invalid or expired Firebase token. Please try again.',
+            ], 401);
+        } catch (\Exception $e) {
+            \Log::error("Firebase sync error for user #{$user->id}: " . $e->getMessage());
+            return response()->json([
+                'message' => 'Verification sync failed. Please try again.',
+            ], 500);
         }
-
-        return redirect(env('FRONTEND_URL', '/app') . '/settings?verified=true');
-
-    }
-
-    /**
-     * Build a correctly-signed verification URL.
-     *
-     * Laravel's URL::temporarySignedRoute() uses APP_URL as its base.
-     * Because APP_URL = https://upgraderproxy.com/api, and api.php routes
-     * already get an /api prefix, it generates .../api/api/auth/... (double).
-     *
-     * This method builds the URL manually using the raw APP_URL base so
-     * the path is correctly: https://upgraderproxy.com/api/auth/verify-email-link
-     */
-    private function buildVerificationUrl(User $user): string
-    {
-        $expires   = now()->addMinutes(60)->timestamp;
-        $id        = $user->id;
-        $hash      = sha1($user->getEmailForVerification());
-
-        // Base URL = APP_URL (https://upgraderproxy.com/api) + the route path as seen by Apache
-        $baseUrl   = rtrim(env('APP_URL', url('/')), '/');
-        $path      = '/auth/verify-email-link';
-
-        // Build query string WITHOUT signature first
-        $params = http_build_query([
-            'expires'   => $expires,
-            'hash'      => $hash,
-            'id'        => $id,
-        ]);
-
-        $urlToSign = $baseUrl . $path . '?' . $params;
-
-        // Generate HMAC signature using app key (same as Laravel's signed URL)
-        $signature = hash_hmac('sha256', $urlToSign, config('app.key'));
-
-        return $urlToSign . '&signature=' . $signature;
     }
 }

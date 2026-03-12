@@ -25,9 +25,8 @@ Route::prefix('auth')->group(function () {
     Route::post('/login',  [\App\Http\Controllers\AuthController::class, 'login']);
     Route::post('/signup', [\App\Http\Controllers\AuthController::class, 'register']);
 
-    // Email Verification Link (Public - no auth needed)
-    Route::get('/verify-email-link', [\App\Http\Controllers\AuthController::class, 'verifyEmailLink'])->name('verification.verify');
-
+    // Email Verification — now handled by Firebase (no backend route needed for link click)
+    // Old magic link route removed. Frontend calls /auth/firebase-sync after Firebase verifies.
     // Google OAuth
     Route::get('/google/redirect', [\App\Http\Controllers\GoogleAuthController::class, 'redirectToGoogle']);
     Route::get('/google/callback', [\App\Http\Controllers\GoogleAuthController::class, 'handleGoogleCallback']);
@@ -35,7 +34,8 @@ Route::prefix('auth')->group(function () {
     Route::middleware(['auth:sanctum', 'banned'])->group(function () {
         Route::get('/me',      [\App\Http\Controllers\AuthController::class, 'me']);
         Route::post('/logout', [\App\Http\Controllers\AuthController::class, 'logout']);
-        Route::post('/resend-verification', [\App\Http\Controllers\AuthController::class, 'resendVerification']);
+        // Firebase sync: called after Firebase confirms emailVerified = true
+        Route::post('/firebase-sync', [\App\Http\Controllers\AuthController::class, 'firebaseSync']);
         Route::post('/2fa/verify', [\App\Http\Controllers\AuthController::class, 'verify2fa'])->withoutMiddleware(['auth:sanctum']);
     });
 });

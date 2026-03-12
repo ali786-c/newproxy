@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SEOHead } from "@/components/seo/SEOHead";
 import { ErrorBanner } from "@/components/shared/ErrorBanner";
@@ -20,10 +20,12 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Trash2, Key, Shield, Copy, Loader2, Check } from "lucide-react";
+import { Plus, Trash2, Key, Shield, Copy, Loader2, Check, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { clientApi, type AllowlistEntry, type ApiKey } from "@/lib/api/dashboard";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { sendEmailVerification } from "firebase/auth";
+import { firebaseAuth } from "@/lib/firebase";
 
 // Mock data removed. Using useQuery.
 
@@ -34,26 +36,13 @@ export default function AppSettings() {
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
 
-  // Handle verification results from URL
+  // Handle verification results from URL (legacy support — no longer primary flow)
   useEffect(() => {
     const verified = searchParams.get("verified");
-    const error = searchParams.get("error");
-
     if (verified === "true") {
-      toast({ title: "Email Verified!", description: "Your account has been successfully verified." });
       refreshUser();
       queryClient.invalidateQueries({ queryKey: ["user"] });
-      // Clean up URL
       searchParams.delete("verified");
-      setSearchParams(searchParams);
-    } else if (verified === "false") {
-      toast({
-        title: "Verification Failed",
-        description: error === "invalid_signature" ? "The link has expired or is invalid." : "There was an error verifying your email.",
-        variant: "destructive"
-      });
-      searchParams.delete("verified");
-      searchParams.delete("error");
       setSearchParams(searchParams);
     }
   }, [searchParams, setSearchParams, refreshUser, queryClient]);
@@ -389,11 +378,15 @@ function ApiKeysPanel() {
 // ── Verification Panel ────────────────────────────────
 
 function VerificationPanel() {
-  const { user, refreshUser } = useAuth();
+  const { user, syncFirebaseVerification } = useAuth();
   const [resending, setResending] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Handle countdown
+  const isVerified = !!user?.email_verified_at;
+
+  // Handle countdown for resend cooldown
   useEffect(() => {
     if (cooldown > 0) {
       const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
@@ -401,20 +394,66 @@ function VerificationPanel() {
     }
   }, [cooldown]);
 
+  // Auto-poll Firebase every 5s when unverified to detect verification
+  useEffect(() => {
+    if (isVerified) {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      return;
+    }
+
+    pollIntervalRef.current = setInterval(async () => {
+      const synced = await syncFirebaseVerification();
+      if (synced) {
+        clearInterval(pollIntervalRef.current!);
+        toast({ title: "✅ Email Verified!", description: "Your account is now fully verified." });
+      }
+    }, 5000);
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [isVerified, syncFirebaseVerification]);
+
+  // Resend Firebase verification email
   const onResend = async () => {
     setResending(true);
     try {
-      await clientApi.resendVerification();
-      toast({ title: "Code Sent", description: "Please check your inbox." });
+      const fbUser = firebaseAuth.currentUser;
+      if (!fbUser) {
+        toast({
+          title: "Session not found",
+          description: "Please log out and log in again, then try resending.",
+          variant: "destructive",
+        });
+        return;
+      }
+      await sendEmailVerification(fbUser);
+      toast({ title: "Verification Email Sent", description: "Please check your inbox and click the link." });
       setCooldown(60);
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      const msg = err.code === "auth/too-many-requests"
+        ? "Too many requests. Please wait a moment before trying again."
+        : err.message ?? "Failed to send verification email.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setResending(false);
     }
   };
 
-  const isVerified = !!user?.email_verified_at;
+  // Manual check button
+  const onManualCheck = async () => {
+    setChecking(true);
+    try {
+      const synced = await syncFirebaseVerification();
+      if (synced) {
+        toast({ title: "✅ Email Verified!", description: "Your account is now fully verified." });
+      } else {
+        toast({ title: "Not yet verified", description: "We couldn't detect verification yet. Please check your email and click the link.", variant: "destructive" });
+      }
+    } finally {
+      setChecking(false);
+    }
+  };
 
   return (
     <Card>
@@ -441,24 +480,42 @@ function VerificationPanel() {
               <div className="space-y-2">
                 <p className="text-sm font-medium">Email Verification Required</p>
                 <p className="text-sm text-muted-foreground">
-                  Your account is not verified. Please click the button below to receive a secure verification link at <strong>{user?.email}</strong>.
+                  A verification email was sent to <strong>{user?.email}</strong>.
+                  Click the link in that email, then come back here — we'll detect it automatically.
                 </p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 flex-wrap">
                 <Button
                   onClick={onResend}
                   disabled={resending || cooldown > 0}
-                  className="px-8"
+                  className="px-6"
                 >
                   {resending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Shield className="mr-2 h-4 w-4" />
                   )}
-                  {cooldown > 0 ? `Resend Link in ${cooldown}s` : "Send Verification Link"}
+                  {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend Verification Email"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={onManualCheck}
+                  disabled={checking}
+                >
+                  {checking ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  Check Status
                 </Button>
               </div>
+
+              <p className="text-xs text-muted-foreground">
+                🔄 This page automatically checks every 5 seconds after you verify your email.
+              </p>
             </div>
           </div>
         )}
