@@ -29,7 +29,7 @@ class GenerateAIPost extends Command
     /**
      * Execute the console command.
      */
-    public function handle(GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing, \App\Services\FacebookService $facebook, \App\Services\XService $x)
+    public function handle(GeminiService $gemini, \App\Services\BlogRenderer $renderer, \App\Services\TelegramService $telegram, \App\Services\GoogleIndexingService $indexing, \App\Services\FacebookService $facebook, \App\Services\XService $x, \App\Services\LinkedInService $linkedin)
     {
         Log::info('Cron: Starting Robust AI blog generation...');
 
@@ -93,7 +93,14 @@ class GenerateAIPost extends Command
             // 7. X (Twitter) Share
             $x->sendTweet($post);
 
-            // 8. Google Indexing
+            // 8. LinkedIn Share
+            try {
+                $linkedin->sendBlogPost($post);
+            } catch (\Exception $e) {
+                Log::error("Cron: LinkedIn Auto-Post Error: " . $e->getMessage());
+            }
+
+            // 9. Google Indexing
             $frontendUrl = config('app.url');
             if (str_ends_with(rtrim($frontendUrl, '/'), '/api')) {
                 $frontendUrl = Str::replaceLast('/api', '', rtrim($frontendUrl, '/'));
