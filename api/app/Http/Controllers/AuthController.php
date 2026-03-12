@@ -68,18 +68,31 @@ class AuthController extends Controller
 
         // --- Trigger Dynamic Emails (Welcome + Admin Alert) ---
         try {
-            // 1. Generate Firebase Verification Link
+            // 1. Ensure Firebase User exists and Get Verification Link
             $credentialsPath = config('services.firebase.credentials');
             $factory = (new Factory)->withServiceAccount($credentialsPath);
             $auth    = $factory->createAuth();
             
-            // We ensure the user exists in Firebase first (or just attempt to generate)
-            // If they just signed up, they should exist in Firebase from frontend.
-            // But we can also create them here if needed for robustness.
-            $firebaseLink = $auth->getEmailVerificationLink($user->email);
+            try {
+                // Check if user exists in Firebase
+                try {
+                    $auth->getUserByEmail($user->email);
+                } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
+                    // Create in Firebase if missing (using same email/password)
+                    $auth->createUser([
+                        'email' => $user->email,
+                        'password' => $request->password,
+                        'displayName' => $user->name,
+                    ]);
+                }
 
-            // 2. Send Verification Email via Laravel/Brevo
-            $user->notify(new \App\Notifications\FirebaseVerificationNotification($firebaseLink, $user->name));
+                $firebaseLink = $auth->getEmailVerificationLink($user->email);
+
+                // 2. Send Verification Email via Laravel/Brevo
+                $user->notify(new \App\Notifications\FirebaseVerificationNotification($firebaseLink, $user->name));
+            } catch (\Exception $e) {
+                \Log::error("Firebase User/Link Error for #{$user->id}: " . $e->getMessage());
+            }
 
             // 3. Welcome Notification
             $user->notify(new \App\Notifications\WelcomeNotification([
@@ -585,6 +598,15 @@ class AuthController extends Controller
             $credentialsPath = config('services.firebase.credentials');
             $factory = (new Factory)->withServiceAccount($credentialsPath);
             $auth    = $factory->createAuth();
+
+            // Ensure user exists in Firebase for resend
+            try {
+                $auth->getUserByEmail($user->email);
+            } catch (\Kreait\Firebase\Exception\Auth\UserNotFound $e) {
+                // If missing in Firebase (reg error), we can't easily recreate without password
+                // but usually they will exist. For resend, we just fail gracefully if truly missing.
+                return response()->json(['message' => 'Firebase account not found. Please contact support.'], 404);
+            }
 
             $firebaseLink = $auth->getEmailVerificationLink($user->email);
             
