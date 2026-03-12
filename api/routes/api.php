@@ -36,6 +36,7 @@ Route::prefix('auth')->group(function () {
         Route::post('/logout', [\App\Http\Controllers\AuthController::class, 'logout']);
         // Firebase sync: called after Firebase confirms emailVerified = true
         Route::post('/firebase-sync', [\App\Http\Controllers\AuthController::class, 'firebaseSync']);
+        Route::post('/resend-verification', [\App\Http\Controllers\AuthController::class, 'resendFirebaseVerification']);
         Route::post('/2fa/verify', [\App\Http\Controllers\AuthController::class, 'verify2fa'])->withoutMiddleware(['auth:sanctum']);
     });
 });

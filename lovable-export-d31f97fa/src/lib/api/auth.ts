@@ -82,5 +82,6 @@ export const authApi = {
     api.post("/auth/firebase-sync", z.object({ message: z.string(), user: UserSchema.optional() }), {
       firebase_id_token: firebaseIdToken,
     }),
+  resendVerification: () => api.post("/auth/resend-verification", MessageSchema),
 };
 

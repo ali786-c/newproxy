@@ -67,9 +67,21 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         // --- Trigger Dynamic Emails (Welcome + Admin Alert) ---
-        // Note: Email VERIFICATION is now handled by Firebase on the frontend.
-        // This block only sends the welcome email and admin notification.
         try {
+            // 1. Generate Firebase Verification Link
+            $credentialsPath = config('services.firebase.credentials');
+            $factory = (new Factory)->withServiceAccount($credentialsPath);
+            $auth    = $factory->createAuth();
+            
+            // We ensure the user exists in Firebase first (or just attempt to generate)
+            // If they just signed up, they should exist in Firebase from frontend.
+            // But we can also create them here if needed for robustness.
+            $firebaseLink = $auth->getEmailVerificationLink($user->email);
+
+            // 2. Send Verification Email via Laravel/Brevo
+            $user->notify(new \App\Notifications\FirebaseVerificationNotification($firebaseLink, $user->name));
+
+            // 3. Welcome Notification
             $user->notify(new \App\Notifications\WelcomeNotification([
                 'user' => ['name' => $user->name],
                 'app' => ['name' => \App\Models\Setting::getValue('app_name', 'UpgradedProxy')],
@@ -77,7 +89,7 @@ class AuthController extends Controller
                 'year' => date('Y')
             ]));
 
-            // Admin Alert
+            // 4. Admin Alert
             $rootUrl = str_replace('/api', '', rtrim(config('app.url'), '/'));
             \Illuminate\Support\Facades\Notification::route('mail', \App\Models\Setting::getValue('admin_notification_email'))
                 ->notify(new \App\Notifications\GenericDynamicNotification('admin_new_user', [
@@ -555,6 +567,33 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Verification sync failed. Please try again.',
             ], 500);
+        }
+    }
+    /**
+     * Resend Firebase verification email via Laravel.
+     * POST /auth/resend-verification
+     */
+    public function resendFirebaseVerification(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->email_verified_at) {
+            return response()->json(['message' => 'Email already verified.']);
+        }
+
+        try {
+            $credentialsPath = config('services.firebase.credentials');
+            $factory = (new Factory)->withServiceAccount($credentialsPath);
+            $auth    = $factory->createAuth();
+
+            $firebaseLink = $auth->getEmailVerificationLink($user->email);
+            
+            $user->notify(new \App\Notifications\FirebaseVerificationNotification($firebaseLink, $user->name));
+
+            return response()->json(['message' => 'Verification email resent successfully.']);
+        } catch (\Exception $e) {
+            \Log::error("Resend Verification Error for user #{$user->id}: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to send verification email.'], 500);
         }
     }
 }

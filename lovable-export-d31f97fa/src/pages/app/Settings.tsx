@@ -414,26 +414,15 @@ function VerificationPanel() {
     };
   }, [isVerified, syncFirebaseVerification]);
 
-  // Resend Firebase verification email
+  // Resend Firebase verification email via SaaS Backend (Brevo)
   const onResend = async () => {
     setResending(true);
     try {
-      const fbUser = firebaseAuth.currentUser;
-      if (!fbUser) {
-        toast({
-          title: "Session not found",
-          description: "Please log out and log in again, then try resending.",
-          variant: "destructive",
-        });
-        return;
-      }
-      await sendEmailVerification(fbUser);
-      toast({ title: "Verification Email Sent", description: "Please check your inbox and click the link." });
+      await authApi.resendVerification();
+      toast({ title: "Verification Email Sent", description: "Please check your inbox (via Brevo) and click the Firebase link." });
       setCooldown(60);
     } catch (err: any) {
-      const msg = err.code === "auth/too-many-requests"
-        ? "Too many requests. Please wait a moment before trying again."
-        : err.message ?? "Failed to send verification email.";
+      const msg = err.message ?? "Failed to send verification email.";
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
       setResending(false);

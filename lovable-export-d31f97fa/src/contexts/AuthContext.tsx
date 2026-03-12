@@ -164,13 +164,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem("referral_code");
         }
 
-        // 2. Create Firebase user and send verification email (non-blocking)
+        // 2. Create Firebase user (non-blocking)
+        // Note: Backend now generates and sends the Firebase verification link via Brevo.
         try {
           const fbCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
-          await sendEmailVerification(fbCredential.user);
           setState((s) => ({ ...s, firebaseUser: fbCredential.user }));
         } catch (fbErr: any) {
-          // Non-fatal — user can resend from Settings page
+          // Non-fatal — user can resend or we'll detect existing account
           console.warn("Firebase signup warning:", fbErr.code, fbErr.message);
         }
 
