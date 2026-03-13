@@ -41,7 +41,11 @@ class GeminiService
 
         $prompt = $this->buildBlogPrompt($keyword, $category, $recentTitles);
 
-        $response = Http::withoutVerifying()->timeout(90)->post($url, [
+        $response = Http::withoutVerifying()
+            ->connectTimeout(30)
+            ->timeout(90)
+            ->retry(3, 2000)
+            ->post($url, [
             'contents' => [
                 ['parts' => [['text' => $prompt]]]
             ],
@@ -78,7 +82,11 @@ class GeminiService
 
         $prompt = $this->buildImageBriefPrompt($blogData);
 
-        $response = Http::withoutVerifying()->timeout(60)->post($url, [
+        $response = Http::withoutVerifying()
+            ->connectTimeout(30)
+            ->timeout(60)
+            ->retry(3, 2000)
+            ->post($url, [
             'contents' => [
                 ['parts' => [['text' => $prompt]]]
             ],
@@ -128,7 +136,11 @@ class GeminiService
         $imageModel = "gemini-3-pro-image-preview"; 
         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$imageModel}:generateContent?key={$this->apiKey}";
 
-        $response = Http::withoutVerifying()->timeout(150)->post($url, [
+        $response = Http::withoutVerifying()
+            ->connectTimeout(30)
+            ->timeout(150)
+            ->retry(3, 2000)
+            ->post($url, [
             'contents' => [
                 ['parts' => [['text' => $imagePrompt]]]
             ]
