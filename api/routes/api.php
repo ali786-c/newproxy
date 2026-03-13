@@ -71,6 +71,7 @@ Route::middleware(['auth:sanctum', 'banned', 'verified'])->group(function () {
     Route::post('/billing/checkout', [\App\Http\Controllers\BillingController::class, 'createCheckout']);
     Route::post('/billing/product-checkout', [\App\Http\Controllers\BillingController::class, 'createProductCheckout']);
     Route::post('/billing/nowpayments-checkout', [\App\Http\Controllers\BillingController::class, 'createNowPaymentsCheckout']);
+    Route::post('/billing/coinbase-checkout', [\App\Http\Controllers\BillingController::class, 'createCoinbaseCheckout']);
     Route::post('/billing/submit-crypto', [\App\Http\Controllers\BillingController::class, 'submitCrypto']);
     Route::post('/billing/setup-intent', [\App\Http\Controllers\BillingController::class, 'createSetupIntent']);
     Route::post('/billing/verify-session', [\App\Http\Controllers\BillingController::class, 'verifySession']);
@@ -124,6 +125,7 @@ Route::middleware(['auth:sanctum', 'banned', 'verified'])->group(function () {
 Route::post('/webhook/stripe', [\App\Http\Controllers\BillingController::class, 'handleWebhook']);
 Route::post('/webhook/cryptomus', [\App\Http\Controllers\BillingController::class, 'handleCryptomusWebhook']);
 Route::post('/webhook/nowpayments', [\App\Http\Controllers\BillingController::class, 'handleNowPaymentsWebhook']);
+Route::post('/webhook/coinbase', [\App\Http\Controllers\BillingController::class, 'handleCoinbaseWebhook']);
 Route::get('/currencies', [\App\Http\Controllers\CurrencyController::class, 'index']);
 Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
 Route::post('/auth/password/email', [\App\Http\Controllers\PasswordResetController::class, 'sendResetLink']);

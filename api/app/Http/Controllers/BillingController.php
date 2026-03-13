@@ -19,6 +19,7 @@ use Stripe\Account;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use App\Helpers\CryptomusHelper;
+use App\Helpers\CoinbaseHelper;
 use App\Services\ReferralService;
 use Illuminate\Http\Request;
 
@@ -328,6 +329,124 @@ class BillingController extends Controller
         return response()->json(['error' => 'Could not create crypto payment.'], 500);
     }
 
+    public function createCoinbaseCheckout(Request $request)
+    {
+        $request->validate([
+            'amount' => 'required|numeric|min:1',
+            'coupon_code' => 'nullable|string',
+        ]);
+
+        $amount = (float) $request->amount;
+        $originalAmount = $amount;
+        $couponCode = $request->coupon_code;
+
+        if ($couponCode) {
+            $coupon = Coupon::where('code', $couponCode)->first();
+            if ($coupon && $coupon->isValid($amount)) {
+                $discount = $coupon->calculateDiscount($amount);
+                $amount = max(0, $amount - $discount);
+            }
+        }
+
+        $apiKey = Setting::getValue('coinbase_api_key') ?: config('services.coinbase.key');
+
+        if (!$apiKey) {
+            return response()->json(['error' => 'Coinbase is not configured.'], 400);
+        }
+
+        $response = Http::withHeaders([
+            'X-Cc-Api-Key' => $apiKey,
+            'X-Cc-Version' => '2018-03-22',
+            'Content-Type' => 'application/json',
+        ])->post('https://api.commerce.coinbase.com/charges', [
+            'name' => 'Wallet Top-up',
+            'description' => "Add funds to your wallet for User #{$request->user()->id}",
+            'pricing_type' => 'fixed_price',
+            'local_price' => [
+                'amount' => (string) $amount,
+                'currency' => 'EUR',
+            ],
+            'metadata' => [
+                'user_id' => $request->user()->id,
+                'type' => 'topup',
+                'amount' => $amount,
+                'original_amount' => $originalAmount,
+                'coupon_code' => $couponCode,
+            ],
+            'redirect_url' => url('/') . '/app/billing?success=true&gateway=coinbase',
+            'cancel_url' => url('/') . '/app/billing?canceled=true',
+        ]);
+
+        if ($response->successful()) {
+            return response()->json(['url' => $response->json('data.hosted_url')]);
+        }
+
+        Log::error('Coinbase API Error: ' . $response->body());
+        return response()->json(['error' => 'Could not create Coinbase payment.'], 500);
+    }
+
+    public function createCoinbaseProductCheckout(Request $request)
+    {
+        $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1',
+            'coupon_code' => 'nullable|string',
+        ]);
+
+        $product = \App\Models\Product::findOrFail($request->product_id);
+        $totalAmount = $product->price * $request->quantity;
+        $originalAmount = $totalAmount;
+        $couponCode = $request->coupon_code;
+
+        if ($couponCode) {
+            $coupon = Coupon::where('code', $couponCode)->first();
+            if ($coupon && $coupon->isValid($totalAmount)) {
+                $discount = $coupon->calculateDiscount($totalAmount);
+                $totalAmount = max(0, $totalAmount - $discount);
+            }
+        }
+
+        $apiKey = Setting::getValue('coinbase_api_key') ?: config('services.coinbase.key');
+
+        if (!$apiKey) {
+            return response()->json(['error' => 'Coinbase is not configured.'], 400);
+        }
+
+        $response = Http::withHeaders([
+            'X-Cc-Api-Key' => $apiKey,
+            'X-Cc-Version' => '2018-03-22',
+            'Content-Type' => 'application/json',
+        ])->post('https://api.commerce.coinbase.com/charges', [
+            'name' => "{$request->quantity}x {$product->name}",
+            'description' => "Direct purchase of {$request->quantity}x {$product->name} proxies",
+            'pricing_type' => 'fixed_price',
+            'local_price' => [
+                'amount' => (string) $totalAmount,
+                'currency' => 'EUR',
+            ],
+            'metadata' => [
+                'user_id' => $request->user()->id,
+                'type' => 'direct_purchase',
+                'product_id' => $product->id,
+                'quantity' => $request->quantity,
+                'country' => $request->country ?? 'US',
+                'session_type' => $request->session_type ?? 'rotating',
+                'amount' => $totalAmount,
+                'original_amount' => $originalAmount,
+                'coupon_code' => $couponCode,
+            ],
+            'redirect_url' => url('/') . '/app/proxies/generate?success=true&direct=true&gateway=coinbase',
+            'cancel_url' => url('/') . '/app/proxies/generate?canceled=true',
+        ]);
+
+        if ($response->successful()) {
+            return response()->json(['url' => $response->json('data.hosted_url')]);
+        }
+
+        Log::error('Coinbase API Error: ' . $response->body());
+        return response()->json(['error' => 'Could not create Coinbase payment.'], 500);
+    }
+
     public function handleCryptomusWebhook(Request $request)
     {
         // IP Whitelisting (Optional but recommended by Cryptomus)
@@ -633,6 +752,155 @@ class BillingController extends Controller
         });
 
         Log::info("NOWPAYMENTS FULFILLMENT COMPLETE for User #{$userId}, UUID: {$uuid}");
+    }
+
+    public function handleCoinbaseWebhook(Request $request)
+    {
+        $payload = $request->getContent();
+        $signature = $request->header('X-Cc-Webhook-Signature');
+        $secret = Setting::getValue('coinbase_webhook_secret') ?: config('services.coinbase.webhook_secret');
+
+        if (!$secret) {
+            Log::error('Coinbase Webhook Error: Shared secret not configured.');
+            return response()->json(['error' => 'Webhook secret not configured'], 401);
+        }
+
+        if (!CoinbaseHelper::verifySignature($payload, $signature, $secret)) {
+            Log::error('Coinbase Webhook Error: Invalid signature.');
+            return response()->json(['error' => 'Invalid signature'], 400);
+        }
+
+        $data = $request->all();
+        $event = $data['event'] ?? [];
+        $type = $event['type'] ?? '';
+        $charge = $event['data'] ?? [];
+        $eventId = $event['id'] ?? null;
+
+        if (!$eventId || WebhookLog::where('event_id', $eventId)->exists()) {
+            return response()->json(['message' => 'Already processed or invalid event ID']);
+        }
+
+        Log::info("Coinbase Webhook received: {$type} for Event ID: {$eventId}");
+
+        if ($type === 'charge:confirmed' || $type === 'charge:resolved') {
+            $metadata = $charge['metadata'] ?? [];
+            if (empty($metadata)) {
+                Log::error("Coinbase Webhook Error: No metadata for Event ID {$eventId}");
+                return response()->json(['error' => 'No metadata found'], 422);
+            }
+            $this->fulfillCoinbasePayment($charge, $eventId, $metadata);
+        }
+
+        return response()->json(['status' => 'success']);
+    }
+
+    protected function fulfillCoinbasePayment($data, $uuid, $metadata)
+    {
+        $userId = $metadata['user_id'] ?? null;
+        $type   = $metadata['type'] ?? 'topup';
+        
+        // local_price or local_payment? local_price is what we set.
+        $amount = (float) ($metadata['amount'] ?? ($data['local_price']['amount'] ?? 0));
+
+        if (!$userId) {
+            Log::error("Coinbase Webhook Error: No user_id in metadata for UUID {$uuid}");
+            return;
+        }
+
+        Log::info("START Coinbase Fulfillment for User #{$userId}, UUID: {$uuid}");
+
+        $referralService = app(ReferralService::class);
+
+        $fulfillmentLog = FulfillmentLog::updateOrCreate(
+            ['event_id' => $uuid],
+            [
+                'user_id'  => $userId,
+                'provider' => 'coinbase',
+                'type'     => $type,
+                'stage'    => 1,
+                'status'   => 'processing',
+                'details'  => [
+                    'event_id' => $uuid,
+                    'amount'   => $amount,
+                    'currency' => $data['local_price']['currency'] ?? 'EUR',
+                    'metadata' => $metadata,
+                    'raw_data' => $data
+                ]
+            ]
+        );
+
+        try {
+            DB::transaction(function () use ($userId, $amount, $uuid, $type, $metadata, $data, $fulfillmentLog) {
+                $user = User::lockForUpdate()->find($userId);
+                if (!$user) return;
+
+                \App\Models\Invoice::updateOrCreate(
+                    ['stripe_invoice_id' => "COINBASE-{$uuid}"],
+                    [
+                        'user_id'     => $user->id,
+                        'amount'      => $amount,
+                        'currency'    => $data['local_price']['currency'] ?? 'EUR',
+                        'status'      => 'paid',
+                        'description' => 'Wallet Top-up (Coinbase)',
+                    ]
+                );
+
+                WebhookLog::updateOrCreate(
+                    ['event_id' => $uuid],
+                    ['provider' => 'coinbase']
+                );
+
+                try {
+                    $user->notify(new \App\Notifications\OrderConfirmationNotification([
+                        'user' => ['name' => $user->name],
+                        'order' => [
+                            'id' => $uuid,
+                            'amount' => ($data['local_price']['currency'] ?? 'EUR') . ' ' . $amount
+                        ],
+                        'action_url' => url('/app/billing'),
+                        'year' => date('Y')
+                    ]));
+                } catch (\Exception $e) {
+                    Log::error("Order Confirmation Email Error (Coinbase): " . $e->getMessage());
+                }
+
+                $fulfillmentLog->update(['stage' => 1, 'status' => 'success']);
+            });
+        } catch (\Exception $e) {
+            $fulfillmentLog->update([
+                'status'        => 'failed',
+                'error_message' => "Stage 1 (Billing) Failed: " . $e->getMessage()
+            ]);
+            Log::error("STAGE 1 FAILED for Coinbase User #{$userId}. Error: " . $e->getMessage());
+            return;
+        }
+
+        $user = User::find($userId);
+        if (!$user) return;
+
+        $originalAmount = (float) ($metadata['original_amount'] ?? $amount);
+        $couponCode     = $metadata['coupon_code'] ?? null;
+        $creditAmount   = $couponCode ? $originalAmount : $amount;
+
+        if ($couponCode) {
+            $coupon = Coupon::where('code', $couponCode)->first();
+            if ($coupon) $coupon->increment('used_count');
+        }
+
+        DB::transaction(function () use ($user, $creditAmount, $amount, $couponCode, $uuid, $referralService, $fulfillmentLog) {
+            $fulfillmentLog->update(['stage' => 3, 'status' => 'success']);
+            $user->increment('balance', $creditAmount);
+            $transaction = WalletTransaction::create([
+                'user_id'     => $user->id,
+                'type'        => 'credit',
+                'amount'      => $creditAmount,
+                'reference'   => "COINBASE-{$uuid}",
+                'description' => 'Coinbase Wallet Top-up' . ($couponCode ? " (Used promo: {$couponCode})" : ''),
+            ]);
+            $referralService->awardCommission($user, $amount, "Commission from Wallet Top-up (Coinbase)", $transaction->id, 'transaction');
+        });
+
+        Log::info("COINBASE FULFILLMENT COMPLETE for User #{$userId}, UUID: {$uuid}");
     }
 
     protected function fulfillCryptomusPayment($data, $uuid, $metadata)
@@ -1633,6 +1901,13 @@ class BillingController extends Controller
                     'last_sync' => now()->toIso8601String(),
                 ],
                 [
+                    'id' => 'coinbase',
+                    'name' => 'Coinbase Commerce',
+                    'status' => Setting::getValue('coinbase_api_key') ? 'connected' : 'not_configured',
+                    'webhook_health' => Setting::getValue('coinbase_webhook_secret') ? 'good' : 'missing',
+                    'last_sync' => now()->toIso8601String(),
+                ],
+                [
                     'id' => 'crypto',
                     'name' => 'Binance Pay (Manual)',
                     'status' => Setting::getValue('binance_pay_id') ? 'connected' : 'not_configured',
@@ -1657,10 +1932,12 @@ class BillingController extends Controller
             'stripe' => !empty(Setting::getValue('stripe_publishable_key')) && Setting::getValue('gateway_stripe_enabled') == '1',
             'cryptomus' => !empty(Setting::getValue('cryptomus_merchant_id')) && Setting::getValue('gateway_cryptomus_enabled') == '1',
             'nowpayments' => !empty(Setting::getValue('nowpayments_api_key')) && Setting::getValue('gateway_nowpayments_enabled') == '1',
+            'coinbase' => !empty(Setting::getValue('coinbase_api_key')) && Setting::getValue('gateway_coinbase_enabled') == '1',
             'crypto' => !empty(Setting::getValue('binance_pay_id')) && Setting::getValue('gateway_crypto_enabled') == '1',
             'stripe_vat' => (float) Setting::getValue('stripe_vat_percentage', 22),
             'cryptomus_vat' => (float) Setting::getValue('cryptomus_vat_percentage', 0),
             'nowpayments_vat' => (float) Setting::getValue('nowpayments_vat_percentage', 0),
+            'coinbase_vat' => (float) Setting::getValue('coinbase_vat_percentage', 0),
             'manual_vat' => (float) Setting::getValue('manual_vat_percentage', 0),
             'binance_pay_id' => Setting::getValue('binance_pay_id'),
             'binance_pay_instructions' => Setting::getValue('binance_pay_instructions'),

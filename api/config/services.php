@@ -73,4 +73,10 @@ return [
         'credentials' => env('FIREBASE_CREDENTIALS'),
     ],
 
+    'coinbase' => [
+        'key' => env('COINBASE_API_KEY'),
+        'webhook_secret' => env('COINBASE_WEBHOOK_SECRET'),
+        'vat_percentage' => env('COINBASE_VAT_PERCENTAGE', 0),
+    ],
+
 ];
