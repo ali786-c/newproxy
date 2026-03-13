@@ -10,6 +10,8 @@ export interface PaymentGatewayState {
   nowpayments_vat: number;
   manual_vat: number;
   nowpayments: boolean;
+  coinbase: boolean;
+  coinbase_vat: number;
   binance_pay_id?: string | null;
   binance_pay_instructions?: string | null;
 }
@@ -34,6 +36,8 @@ export function PaymentConfigProvider({ children }: { children: ReactNode }) {
     stripe_vat: 22,
     cryptomus_vat: 0,
     nowpayments_vat: 0,
+    coinbase: false,
+    coinbase_vat: 0,
     manual_vat: 0,
   });
   const [autoTopUpEnabled, setAutoTopUpEnabled] = useState(false);
@@ -51,6 +55,8 @@ export function PaymentConfigProvider({ children }: { children: ReactNode }) {
           stripe_vat: config.stripe_vat ?? 22,
           cryptomus_vat: config.cryptomus_vat ?? 0,
           nowpayments_vat: (config as any).nowpayments_vat ?? 0,
+          coinbase: (config as any).coinbase || false,
+          coinbase_vat: (config as any).coinbase_vat ?? 0,
           manual_vat: config.manual_vat ?? 0,
           binance_pay_id: config.binance_pay_id,
           binance_pay_instructions: config.binance_pay_instructions,

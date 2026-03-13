@@ -41,7 +41,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
 };
 
 
-type PaymentMethod = "stripe" | "cryptomus" | "nowpayments" | "manual";
+type PaymentMethod = "stripe" | "cryptomus" | "nowpayments" | "coinbase" | "manual";
 
 export default function Billing() {
   const queryClient = useQueryClient();
@@ -76,6 +76,8 @@ export default function Billing() {
 
     if (params.get("success") === "true") {
       const sessionId = params.get("session_id");
+      const gateway = params.get("gateway");
+
       // Clean URL immediately
       window.history.replaceState({}, document.title, window.location.pathname);
 
@@ -161,6 +163,7 @@ export default function Billing() {
     if (selectedMethod === "stripe") currentVatRate = gateways.stripe_vat / 100;
     else if (selectedMethod === "cryptomus") currentVatRate = gateways.cryptomus_vat / 100;
     else if (selectedMethod === "nowpayments") currentVatRate = (gateways.nowpayments_vat || 0) / 100;
+    else if (selectedMethod === "coinbase") currentVatRate = (gateways.coinbase_vat || 0) / 100;
     else if (selectedMethod === "manual") currentVatRate = gateways.manual_vat / 100;
   }
 
@@ -269,6 +272,16 @@ export default function Billing() {
       } finally {
         setIsSubmitting(false);
       }
+    } else if (selectedMethod === "coinbase") {
+      setIsSubmitting(true);
+      try {
+        const { url } = await clientApi.createCoinbaseCheckout(numAmount, appliedCoupon?.code);
+        window.location.href = url;
+      } catch (err: any) {
+        toast({ title: "Checkout Error", description: err.message, variant: "destructive" });
+      } finally {
+        setIsSubmitting(false);
+      }
     } else if (selectedMethod === "stripe") {
       setIsSubmitting(true);
       try {
@@ -297,6 +310,7 @@ export default function Billing() {
   const PAYMENT_METHODS = [
     { id: "stripe" as PaymentMethod, name: "Card (Stripe)", subtitle: "Credit/Debit Card", icon: CreditCard, vatLabel: gateways.stripe_vat > 0 ? `+${gateways.stripe_vat}% Fee` : "No Fee", enabled: gateways.stripe },
     { id: "nowpayments" as PaymentMethod, name: "Crypto (NP)", subtitle: "Bitcoin/Altcoins", icon: Bitcoin, vatLabel: gateways.nowpayments_vat > 0 ? `+${gateways.nowpayments_vat}% Fee` : "No Fee", enabled: gateways.nowpayments },
+    { id: "coinbase" as PaymentMethod, name: "Crypto (CB)", subtitle: "Coinbase Commerce", icon: Bitcoin, vatLabel: gateways.coinbase_vat > 0 ? `+${gateways.coinbase_vat}% Fee` : "No Fee", enabled: gateways.coinbase },
     { id: "cryptomus" as PaymentMethod, name: "Crypto (CM)", subtitle: "Automated via Cryptomus", icon: Bitcoin, vatLabel: gateways.cryptomus_vat > 0 ? `+${gateways.cryptomus_vat}% Fee` : "No Fee", enabled: gateways.cryptomus },
     { id: "manual" as PaymentMethod, name: "Binance Pay", subtitle: "Manual Transfer", icon: Bitcoin, vatLabel: gateways.manual_vat > 0 ? `+${gateways.manual_vat}% Fee` : "No Fee", enabled: gateways.crypto },
   ];

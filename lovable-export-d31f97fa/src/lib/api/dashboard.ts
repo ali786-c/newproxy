@@ -219,6 +219,8 @@ export const clientApi = {
     api.post("/billing/cryptomus-checkout", z.object({ url: z.string() }), { amount, coupon_code: couponCode }),
   createNowPaymentsCheckout: (amount: number, couponCode?: string) =>
     api.post("/billing/nowpayments-checkout", z.object({ url: z.string() }), { amount, coupon_code: couponCode }),
+  createCoinbaseCheckout: (amount: number, couponCode?: string) =>
+    api.post("/billing/coinbase-checkout", z.object({ url: z.string() }), { amount, coupon_code: couponCode }),
   createProductCheckout: (productId: string, quantity: number, country?: string, session_type?: string, couponCode?: string) =>
     api.post("/billing/product-checkout", z.object({ url: z.string() }), {
       product_id: productId,
@@ -229,6 +231,14 @@ export const clientApi = {
     }),
   createCryptomusProductCheckout: (productId: string, quantity: number, country?: string, session_type?: string, couponCode?: string) =>
     api.post("/billing/cryptomus-product-checkout", z.object({ url: z.string() }), {
+      product_id: productId,
+      quantity,
+      country,
+      session_type,
+      coupon_code: couponCode
+    }),
+  createCoinbaseProductCheckout: (productId: string, quantity: number, country?: string, session_type?: string, couponCode?: string) =>
+    api.post("/billing/coinbase-product-checkout", z.object({ url: z.string() }), {
       product_id: productId,
       quantity,
       country,
@@ -251,9 +261,11 @@ export const clientApi = {
       crypto: z.boolean(),
       cryptomus: z.boolean(),
       nowpayments: z.boolean().optional(),
+      coinbase: z.boolean().optional(),
       stripe_vat: z.number().optional(),
       cryptomus_vat: z.number().optional(),
       nowpayments_vat: z.number().optional(),
+      coinbase_vat: z.number().optional(),
       manual_vat: z.number().optional(),
       binance_pay_id: z.string().nullable().optional(),
       binance_pay_instructions: z.string().nullable().optional(),
