@@ -17,6 +17,8 @@ class SettingsController extends Controller
         'cryptomus_webhook_secret',
         'nowpayments_api_key',
         'nowpayments_ipn_secret',
+        'coinbase_api_key',
+        'coinbase_webhook_secret',
         'smtp_pass',
     ];
 
@@ -66,7 +68,14 @@ class SettingsController extends Controller
         'referral_hold_days',
         'stripe_vat_percentage',
         'cryptomus_vat_percentage',
+        'nowpayments_vat_percentage',
+        'coinbase_vat_percentage',
         'manual_vat_percentage',
+        'gateway_stripe_enabled',
+        'gateway_cryptomus_enabled',
+        'gateway_nowpayments_enabled',
+        'gateway_coinbase_enabled',
+        'gateway_crypto_enabled',
     ];
 
     /**
@@ -96,6 +105,9 @@ class SettingsController extends Controller
             'nowpayments_api_key'    => 'services.nowpayments.api_key',
             'nowpayments_ipn_secret' => 'services.nowpayments.ipn_secret',
             'nowpayments_vat_percentage' => 'services.nowpayments.vat_percentage',
+            'coinbase_api_key'       => 'services.coinbase.key',
+            'coinbase_webhook_secret' => 'services.coinbase.webhook_secret',
+            'coinbase_vat_percentage' => 'services.coinbase.vat_percentage',
         ];
 
         foreach ($envMap as $dbKey => $configKey) {
@@ -133,6 +145,8 @@ class SettingsController extends Controller
             'admin_notification_email' => 'sometimes|email',
             'stripe_vat_percentage' => 'sometimes|numeric|min:0|max:100',
             'cryptomus_vat_percentage' => 'sometimes|numeric|min:0|max:100',
+            'nowpayments_vat_percentage' => 'sometimes|numeric|min:0|max:100',
+            'coinbase_vat_percentage' => 'sometimes|numeric|min:0|max:100',
             'manual_vat_percentage' => 'sometimes|numeric|min:0|max:100',
             'min_balance_threshold' => 'sometimes|numeric|min:0',
             'default_topup_amount' => 'sometimes|numeric|min:1',
@@ -256,6 +270,9 @@ class SettingsController extends Controller
             'nowpayments_api_key'    => 'NOWPAYMENTS_API_KEY',
             'nowpayments_ipn_secret' => 'NOWPAYMENTS_IPN_SECRET',
             'nowpayments_vat_percentage' => 'NOWPAYMENTS_VAT_PERCENTAGE',
+            'coinbase_api_key'       => 'COINBASE_API_KEY',
+            'coinbase_webhook_secret' => 'COINBASE_WEBHOOK_SECRET',
+            'coinbase_vat_percentage' => 'COINBASE_VAT_PERCENTAGE',
         ];
 
         if (!isset($envMap[$key])) return;

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface GatewayConfig {
-  id: "stripe" | "paypal" | "crypto" | "cryptomus" | "nowpayments";
+  id: "stripe" | "paypal" | "crypto" | "cryptomus" | "nowpayments" | "coinbase";
   name: string;
   icon: typeof CreditCard;
   fields: { key: string; label: string; placeholder: string; value: string; secret?: boolean }[];
@@ -72,6 +72,16 @@ const GATEWAY_TEMPLATES: GatewayConfig[] = [
       { key: "cryptomus_api_key", label: "Payment/API Key", placeholder: "Your API key", value: "", secret: true },
       { key: "cryptomus_webhook_secret", label: "Webhook Secret", placeholder: "Your webhook key", value: "", secret: true },
       { key: "cryptomus_vat_percentage", label: "VAT/Fee Percentage (%)", placeholder: "e.g., 0", value: "" },
+    ],
+  },
+  {
+    id: "coinbase",
+    name: "Coinbase Commerce (Automated Crypto)",
+    icon: Bitcoin,
+    fields: [
+      { key: "coinbase_api_key", label: "API Key", placeholder: "Your Coinbase API key", value: "", secret: true },
+      { key: "coinbase_webhook_secret", label: "Webhook Secret", placeholder: "Your webhook shared secret", value: "", secret: true },
+      { key: "coinbase_vat_percentage", label: "VAT/Fee Percentage (%)", placeholder: "e.g., 1", value: "" },
     ],
   },
 ];
