@@ -35,6 +35,7 @@ const TYPE_MAP: Record<string, string> = {
   rp: "residential",
   mp: "mobile",
   dc: "datacenter",
+  sdc: "shared_datacenter",
   dc_ipv6: "datacenter_ipv6",
   dc_unmetered: "datacenter_unmetered",
 };
@@ -43,6 +44,7 @@ const SLUG_MAP: Record<string, string> = {
   rp: "residential",
   mp: "mobile",
   dc: "datacenter",
+  sdc: "shared-datacenter",
   dc_ipv6: "datacenter-ipv6",
   dc_unmetered: "datacenter-unmetered",
 };

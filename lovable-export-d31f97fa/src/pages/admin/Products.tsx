@@ -374,6 +374,7 @@ export default function AdminProducts() {
                   <SelectContent>
                     <SelectItem value="rp">Residential (rp)</SelectItem>
                     <SelectItem value="dc">Datacenter (dc)</SelectItem>
+                    <SelectItem value="sdc">Shared Datacenter (sdc)</SelectItem>
                     <SelectItem value="mp">Mobile (mp)</SelectItem>
                     <SelectItem value="isp">General ISP (isp)</SelectItem>
                     <SelectItem value="isp_shared">Shared Static ISP (isp_shared)</SelectItem>

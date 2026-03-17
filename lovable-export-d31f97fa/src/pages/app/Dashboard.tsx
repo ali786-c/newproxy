@@ -71,6 +71,22 @@ const PRODUCTS = [
     ctaVariant: "default" as const,
   },
   {
+    id: "sdc",
+    name: "Shared Datacenter",
+    subtitle: "High-Speed Shared Datacenter IPs",
+    price: "0.59",
+    unit: "GB",
+    icon: Server,
+    features: [
+      "Shared high-performance IPs",
+      "Cost-effective scaling",
+      "99.9% uptime guarantee",
+      "Ideal for bulk web scraping",
+    ],
+    cta: "Get Started",
+    ctaVariant: "default" as const,
+  },
+  {
     id: "mp",
     name: "Mobile Proxies",
     subtitle: "Real human phone IPs",
