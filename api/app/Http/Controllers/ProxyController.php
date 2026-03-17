@@ -111,21 +111,27 @@ class ProxyController extends Controller
                 $order->update(['status' => 'active']);
 
                 $portMap = [
-                    'rp'  => 1000,
-                    'mp'  => 3000,
-                    'isp' => 3000,
-                    'dc'  => 2000
+                    'rp'           => 1000,
+                    'mp'           => 3000,
+                    'isp'          => 3000,
+                    'dc'           => 2000,
+                    'sdc'          => 2000,
+                    'dc_ipv6'      => 2000,
+                    'dc_unmetered' => 2000,
+                    'rp_ipv6'      => 1000,
                 ];
                 $hostMap = [
-                    'rp'  => 'proxy.upgraderproxy.com',
-                    'mp'  => 'proxy.upgraderproxy.com',
-                    'dc'  => 'proxy.upgraderproxy.com',
-                    'dc_ipv6' => 'proxy.upgraderproxy.com',
+                    'rp'           => 'proxy.upgraderproxy.com',
+                    'mp'           => 'proxy.upgraderproxy.com',
+                    'dc'           => 'proxy.upgraderproxy.com',
+                    'sdc'          => 'proxy.upgraderproxy.com',
+                    'dc_ipv6'      => 'proxy.upgraderproxy.com',
                     'dc_unmetered' => 'proxy.upgraderproxy.com',
-                    'isp' => 'proxy.upgraderproxy.com',
-                    'isp_shared' => 'proxy.upgraderproxy.com',
-                    'isp_private' => 'proxy.upgraderproxy.com',
-                    'isp_virgin' => 'proxy.upgraderproxy.com',
+                    'isp'          => 'proxy.upgraderproxy.com',
+                    'isp_shared'   => 'proxy.upgraderproxy.com',
+                    'isp_private'  => 'proxy.upgraderproxy.com',
+                    'isp_virgin'   => 'proxy.upgraderproxy.com',
+                    'rp_ipv6'      => 'proxy.upgraderproxy.com',
                 ];
 
                 $port    = $portMap[$product->type] ?? 1000;

@@ -107,10 +107,13 @@ class EvomiService
     public function allocateBandwidth(string $username, int $balanceMb, string $type = 'rp')
     {
         $map = [
-            'rp'  => 'give_rp_balance',
-            'mp'  => 'give_mp_balance',
-            'isp' => 'give_isp_balance',
-            'dc'  => 'give_dc_balance',
+            'rp'           => 'give_rp_balance',
+            'mp'           => 'give_mp_balance',
+            'isp'          => 'give_isp_balance',
+            'dc'           => 'give_dc_balance',
+            'sdc'          => 'give_dc_balance', // Shared DC uses DC balance endpoint but different proxy credentials
+            'dc_unmetered' => 'give_dc_balance',
+            'dc_ipv6'      => 'give_dc_balance',
         ];
         $endpoint = $map[$type] ?? 'give_rp_balance';
 
@@ -249,11 +252,12 @@ class EvomiService
             'residential'      => 'rp',
             'mobile'           => 'mp',
             'dataCenter'       => 'dc',
-            'sharedDataCenter' => 'dc',
+            'sharedDataCenter' => 'sdc',
             'static'           => 'isp',
             'isp'              => 'isp',
             'residentialIPV6'  => 'rp_ipv6',
             'dataCenterIPV6'   => 'dc_ipv6',
+            'unmetered'        => 'dc_unmetered',
         ];
 
         // Try nested data.products first, then top-level products
