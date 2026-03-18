@@ -287,7 +287,19 @@ export default function Proxies() {
                       <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>
                         {(() => {
-                          const typeToUse = productType === "residential" ? "rp" : productType === "datacenter" ? "dc" : productType === "mobile" ? "mp" : productType;
+                          const dcTypes = ["dc", "sdc", "datacenter", "shared_datacenter", "dc_ipv6", "dc_unmetered"];
+                          let typeToUse = "rp";
+                          if (dcTypes.includes(productType)) {
+                            typeToUse = "dc";
+                          } else if (productType === "mp" || productType === "mobile") {
+                            typeToUse = "mp";
+                          } else if (productType === "rp" || productType === "residential") {
+                            typeToUse = "rp";
+                          } else {
+                            // Fallback to whatever productType is if it exists in JSON
+                            typeToUse = (evomiCountries as any)[productType] ? productType : "rp";
+                          }
+
                           const countriesObj = (evomiCountries as Record<string, Record<string, string>>)[typeToUse] || {};
                           return Object.entries(countriesObj).map(([code, name]) => (
                             <SelectItem key={code} value={code}>{name as string}</SelectItem>
