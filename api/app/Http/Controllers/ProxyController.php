@@ -113,12 +113,11 @@ class ProxyController extends Controller
                 $portMap = [
                     'rp'           => 1000,
                     'mp'           => 3000,
-                    'isp'          => 3000,
-                    'dc'           => 2000,
-                    'sdc'          => 2000,
-                    'dc_ipv6'      => 2000,
-                    'dc_unmetered' => 2000,
-                    'rp_ipv6'      => 1000,
+                    'sdc'          => 2000, // Shared Datacenter use port 2000 usually
+                    'dc'           => 2000, 
+                    'dc_ipv6'      => 4000,
+                    'dc_unmetered' => 5000,
+                    'rp_ipv6'      => 6000,
                 ];
                 $hostMap = [
                     'rp'           => 'proxy.upgraderproxy.com',

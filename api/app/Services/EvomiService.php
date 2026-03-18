@@ -110,10 +110,10 @@ class EvomiService
             'rp'           => 'give_rp_balance',
             'mp'           => 'give_mp_balance',
             'isp'          => 'give_isp_balance',
-            'dc'           => 'give_dc_balance',
-            'sdc'          => 'give_dc_balance', // Shared DC uses DC balance endpoint but different proxy credentials
-            'dc_unmetered' => 'give_dc_balance',
-            'dc_ipv6'      => 'give_dc_balance',
+            'dc'           => 'give_dc_balance', // Consider changing if DC still 404s
+            'sdc'          => 'give_sdc_balance',
+            'dc_unmetered' => 'give_sdc_balance', // Assuming these also use sdc/dc balance
+            'dc_ipv6'      => 'give_sdc_balance',
         ];
         $endpoint = $map[$type] ?? 'give_rp_balance';
 
